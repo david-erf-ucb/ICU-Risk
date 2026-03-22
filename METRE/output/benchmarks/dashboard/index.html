@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ICU Case Load</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root { --risk-low: #4caf50; --risk-elevated: #ffc107; --risk-high: #f44336; --card-bg: #fff; --border: #e0e0e0; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 24px; background: #f5f5f5; color: #333; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    header { margin-bottom: 28px; }
+    h1 { font-size: 1.75rem; font-weight: 600; margin: 0 0 4px 0; }
+    .subtitle { color: #666; font-size: 0.9rem; }
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 32px; }
+    .card { background: var(--card-bg); border-radius: 10px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border: 1px solid var(--border); }
+    .card.total { border-left: 4px solid #2196f3; }
+    .card.mortality { border-left: 4px solid var(--risk-high); }
+    .card.arf { border-left: 4px solid #ff9800; }
+    .card.shock { border-left: 4px solid #9c27b0; }
+    .card-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: #666; margin-bottom: 6px; }
+    .card-value { font-size: 2rem; font-weight: 700; line-height: 1.2; }
+    .card-detail { font-size: 0.85rem; color: #666; margin-top: 4px; }
+    .charts-grid { display: flex; flex-direction: column; gap: 24px; }
+    .chart-card { background: var(--card-bg); border-radius: 10px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border: 1px solid var(--border); }
+    .chart-card h3 { margin: 0 0 16px 0; font-size: 1rem; font-weight: 600; }
+    .chart-container { position: relative; height: 180px; }
+    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .chart-hero-card { margin-bottom: 16px; padding: 16px; border-radius: 8px; border: 1px solid var(--border); border-left: 4px solid; text-align: center; }
+    .meta { margin-top: 24px; font-size: 0.8rem; color: #888; }
+    .error { background: #ffebee; color: #c62828; padding: 16px; border-radius: 8px; margin: 20px 0; }
+    .tabs { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 1px solid #ddd; }
+    .tabs a { padding: 10px 20px; color: #666; text-decoration: none; font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .tabs a:hover { color: #333; }
+    .tabs a.active { color: #2196f3; border-bottom-color: #2196f3; }
+    .demo-controls { background: #fff8e1; border: 2px dashed #ffb300; border-radius: 10px; padding: 12px 20px; margin-bottom: 20px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .demo-controls .demo-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: #f57f17; font-weight: 700; }
+    .demo-controls .play-btn { width: 40px; height: 40px; border-radius: 50%; border: 2px solid #f57f17; background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: #f57f17; transition: all 0.15s; }
+    .demo-controls .play-btn:hover { background: #fff8e1; }
+    .demo-controls .play-btn.playing { background: #f57f17; color: #fff; }
+    .demo-controls .speed-group { display: flex; align-items: center; gap: 8px; }
+    .demo-controls .speed-group label { font-size: 0.85rem; color: #666; white-space: nowrap; }
+    .demo-controls .speed-group input[type="range"] { width: 100px; accent-color: #f57f17; }
+    .demo-controls .speed-value { font-size: 0.85rem; font-weight: 600; color: #f57f17; min-width: 40px; font-variant-numeric: tabular-nums; }
+    .demo-controls .reset-btn { padding: 6px 14px; border: 1px solid #ffb300; background: #fff; border-radius: 6px; cursor: pointer; font-size: 0.8rem; color: #f57f17; font-weight: 500; }
+    .demo-controls .reset-btn:hover { background: #fff8e1; }
+    .demo-controls .time-row { display: flex; align-items: center; gap: 12px; width: 100%; }
+    .demo-controls .time-row input[type="range"] { flex: 1; min-width: 200px; accent-color: #f57f17; }
+    .demo-elapsed { font-size: 0.8rem; color: #888; white-space: nowrap; }
+
+    .app-clock { font-size: 1.1rem; font-weight: 600; color: #1976d2; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .app-stats { font-size: 0.85rem; color: #666; margin-top: 2px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <nav class="tabs">
+      <a href="index.html" class="active">Summary</a>
+      <a href="patient_list.html">Patient List</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+    <header>
+      <div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;">
+        <h1>ICU Case Load</h1>
+        <div class="app-clock" id="demoClock">Jan 15, 2024 8:00 AM</div>
+      </div>
+      <p class="subtitle">Predicted risk distribution for currently admitted patients. High risk = probability ≥ <span id="thresholdDisplay">0.5</span>.</p>
+      <div class="app-stats" id="timeStats"></div>
+    </header>
+
+    <div class="demo-controls" id="demoControls" style="display:none;">
+      <span class="demo-label">Demo</span>
+      <button class="play-btn" id="playBtn" title="Play / Pause">▶</button>
+      <div class="speed-group">
+        <label for="speedSlider">Speed</label>
+        <input type="range" id="speedSlider" min="1" max="5" step="1" value="2">
+        <span class="speed-value" id="speedValue">5x</span>
+      </div>
+      <button class="reset-btn" id="resetBtn">Reset</button>
+      <span class="demo-elapsed" id="timeDisplay">(+0:00)</span>
+      <div class="time-row">
+        <input type="range" id="timeSlider" min="0" max="14400" step="1" value="0">
+      </div>
+    </div>
+
+    <div id="summary" class="summary-grid"></div>
+    <div id="charts" class="charts-grid"></div>
+    <p class="meta" id="meta"></p>
+  </div>
+
+  <script>
+    const BIN_LABELS = ['0–10%','10–20%','20–30%','30–40%','40–50%','50–60%','60–70%','70–80%','80–90%','90–100%'];
+    const BINS = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
+    const STORAGE_KEY = 'metre_settings';
+    const DEFAULTS = { threshold_high: 0.5, threshold_elevated: 0.2 };
+    const TASKS = [
+      { key: 'hosp_mort_24h_gap4h', label: 'In-hospital mortality', cls: 'mortality' },
+      { key: 'ARF_2h_gap4h', label: 'ARF (2h)', cls: 'arf' },
+      { key: 'ARF_6h_gap4h', label: 'ARF (6h)', cls: 'arf' },
+      { key: 'shock_2h_gap4h', label: 'Shock (2h)', cls: 'shock' },
+      { key: 'shock_6h_gap4h', label: 'Shock (6h)', cls: 'shock' },
+    ];
+    const LOS_BINS = [0, 24, 48, 72, 96, 120, 168, 99999];
+    const LOS_LABELS = ['0–24h','24–48h','48–72h','72–96h','96–120h','120–168h','168h+'];
+
+    function loadSettings() {
+      try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) return { ...DEFAULTS, ...JSON.parse(raw) }; } catch (_) {}
+      return { ...DEFAULTS };
+    }
+    let settings = loadSettings();
+
+    const BASE_DATE = new Date(2024, 0, 15, 8, 0, 0);
+    function fmtTime(m) { return '+' + Math.floor(m/60) + ':' + String(m%60).padStart(2,'0'); }
+    function fmtClock(totalMinutes) {
+      const d = new Date(BASE_DATE.getTime() + totalMinutes * 60000);
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const hh = d.getHours();
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      const ampm = hh >= 12 ? 'PM' : 'AM';
+      const h12 = hh % 12 || 12;
+      return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} ${h12}:${mm} ${ampm}`;
+    }
+
+    function binColors() {
+      const mids = [0.05,0.15,0.25,0.35,0.45,0.55,0.65,0.75,0.85,0.95];
+      return mids.map(m => m >= settings.threshold_high ? 'rgba(244,67,54,0.8)' : m >= settings.threshold_elevated ? 'rgba(255,193,7,0.8)' : 'rgba(76,175,80,0.8)');
+    }
+
+    async function loadPatientList() {
+      try { const r = await fetch('patient_list.json'); if (r.ok) return await r.json(); } catch (_) {}
+      return null;
+    }
+    async function loadEvents() {
+      try { const r = await fetch('patient_events.json'); if (r.ok) return await r.json(); } catch (_) {}
+      return null;
+    }
+
+    let patientListData = null;
+    let eventsData = null;
+    let currentMinutes = 0;
+    let chartInstances = [];
+
+    function getActivePatients() {
+      if (!patientListData) return [];
+      const hasEvents = eventsData != null;
+      return patientListData.patients.filter(p => {
+        if (!hasEvents) return true;
+        const losMinutes = (p.los_icu || 0) * 60;
+        return !(losMinutes > 0 && currentMinutes > losMinutes);
+      });
+    }
+
+    function computeDistribution(patients, taskKey) {
+      const vals = patients.map(p => p[taskKey]).filter(v => v != null && !isNaN(v));
+      const hist = new Array(BINS.length - 1).fill(0);
+      for (const v of vals) {
+        for (let i = 0; i < BINS.length - 1; i++) {
+          if (v >= BINS[i] && (v < BINS[i+1] || (i === BINS.length - 2 && v <= BINS[i+1]))) { hist[i]++; break; }
+        }
+      }
+      return { distribution: hist, n_total: vals.length };
+    }
+
+    function renderAll() {
+      settings = loadSettings();
+      document.getElementById('thresholdDisplay').textContent = settings.threshold_high;
+
+      const active = getActivePatients();
+      const totalAll = patientListData ? patientListData.patients.length : 0;
+      const discharged = totalAll - active.length;
+
+      // Summary cards
+      const losVals = active.map(p => p.los_icu || 0);
+      const losHist = new Array(LOS_BINS.length - 1).fill(0);
+      for (const v of losVals) {
+        for (let i = 0; i < LOS_BINS.length - 1; i++) {
+          if (v >= LOS_BINS[i] && v < LOS_BINS[i+1]) { losHist[i]++; break; }
+        }
+      }
+
+      document.getElementById('summary').innerHTML = `
+        <div class="card total">
+          <div class="card-label">Currently in ICU</div>
+          <div class="card-value">${active.length}</div>
+          <div class="card-detail">${discharged} discharged of ${totalAll} total</div>
+        </div>
+        <div class="card" style="border-left: 4px solid #009688;">
+          <div class="card-label">LOS Distribution</div>
+          <div style="position:relative;height:140px;"><canvas id="losChart"></canvas></div>
+        </div>
+      `;
+      const losCtx = document.getElementById('losChart')?.getContext('2d');
+      if (losCtx) {
+        new Chart(losCtx, {
+          type: 'bar',
+          data: { labels: LOS_LABELS, datasets: [{ data: losHist, backgroundColor: 'rgba(0,150,136,0.7)' }] },
+          options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+        });
+      }
+
+      // Risk charts
+      chartInstances.forEach(c => c.destroy());
+      chartInstances = [];
+      const container = document.getElementById('charts');
+      container.innerHTML = '';
+
+      const thHigh = settings.threshold_high;
+      const thElev = settings.threshold_elevated;
+      const colors = binColors();
+
+      const taskOrder = TASKS;
+      const mort = taskOrder[0];
+
+      function heroHtml(task, dist) {
+        let nHigh = 0;
+        for (let i = 0; i < dist.distribution.length; i++) {
+          const mid = (BINS[i] + BINS[i+1]) / 2;
+          if (mid >= thHigh) nHigh += dist.distribution[i];
+        }
+        const pct = dist.n_total > 0 ? (100 * nHigh / dist.n_total).toFixed(1) : '0';
+        const borderColor = task.cls === 'mortality' ? '#f44336' : task.cls === 'arf' ? '#ff9800' : '#9c27b0';
+        const lbl = task.cls === 'mortality' ? 'High Mortality Risk' : task.label.includes('ARF') ? `High ARF Risk` : `High Shock Risk`;
+        return `<div class="chart-hero-card" style="border-left-color:${borderColor}">
+          <div class="card-label">${lbl}</div><div class="card-value">${nHigh}</div>
+          <div class="card-detail">${pct}% of ${dist.n_total} · threshold ≥${(thHigh*100).toFixed(0)}%</div></div>`;
+      }
+
+      const dists = taskOrder.map(t => computeDistribution(active, t.key));
+
+      container.innerHTML = `<div class="chart-card">${heroHtml(mort, dists[0])}<h3>${mort.label}</h3><div class="chart-container"><canvas id="chart0"></canvas></div></div>`;
+      container.innerHTML += `<div class="charts-row">
+        <div class="chart-card">${heroHtml(taskOrder[1], dists[1])}<h3>${taskOrder[1].label}</h3><div class="chart-container"><canvas id="chart1"></canvas></div></div>
+        <div class="chart-card">${heroHtml(taskOrder[2], dists[2])}<h3>${taskOrder[2].label}</h3><div class="chart-container"><canvas id="chart2"></canvas></div></div>
+      </div>`;
+      container.innerHTML += `<div class="charts-row">
+        <div class="chart-card">${heroHtml(taskOrder[3], dists[3])}<h3>${taskOrder[3].label}</h3><div class="chart-container"><canvas id="chart3"></canvas></div></div>
+        <div class="chart-card">${heroHtml(taskOrder[4], dists[4])}<h3>${taskOrder[4].label}</h3><div class="chart-container"><canvas id="chart4"></canvas></div></div>
+      </div>`;
+
+      dists.forEach((dist, i) => {
+        const ctx = document.getElementById('chart'+i)?.getContext('2d');
+        if (!ctx) return;
+        const chart = new Chart(ctx, {
+          type: 'bar',
+          data: { labels: BIN_LABELS, datasets: [{ data: dist.distribution, backgroundColor: colors }] },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true, title: { display: true, text: 'Count' } }, x: { title: { display: true, text: 'Risk score' } } },
+            plugins: { legend: { display: false } }
+          }
+        });
+        chartInstances.push(chart);
+      });
+
+      const hasEvents = eventsData != null;
+      if (hasEvents) {
+        document.getElementById('timeStats').textContent = `${active.length} active · ${discharged} discharged`;
+      }
+      document.getElementById('meta').textContent =
+        `${active.length} active patients · Model: ${patientListData?.model || 'LR'} · High risk ≥ ${(thHigh*100).toFixed(0)}%`;
+    }
+
+    // ── Time slider ─────────────────────────────────────────────────
+    const timeSlider = document.getElementById('timeSlider');
+    const timeDisplay = document.getElementById('timeDisplay');
+
+    function updateTime() {
+      currentMinutes = parseInt(timeSlider.value);
+      timeDisplay.textContent = '(' + fmtTime(currentMinutes) + ')';
+      document.getElementById('demoClock').textContent = fmtClock(currentMinutes);
+      renderAll();
+    }
+    timeSlider.addEventListener('input', updateTime);
+
+    // ── Demo playback ───────────────────────────────────────────────
+    const playBtn = document.getElementById('playBtn');
+    const speedSlider = document.getElementById('speedSlider');
+    const speedValue = document.getElementById('speedValue');
+    const resetBtn = document.getElementById('resetBtn');
+
+    const SPEED_MAP = { 1: 1, 2: 5, 3: 15, 4: 60, 5: 180 };
+    const SPEED_LABELS = { 1: '1x', 2: '5x', 3: '15x', 4: '60x', 5: '180x' };
+    let playing = false, playInterval = null;
+    const TICK_MS = 50;
+
+    speedSlider.addEventListener('input', () => {
+      speedValue.textContent = SPEED_LABELS[parseInt(speedSlider.value)] || speedSlider.value+'x';
+    });
+
+    function startPlayback() {
+      if (playing) return;
+      playing = true;
+      playBtn.textContent = '⏸'; playBtn.classList.add('playing');
+      playInterval = setInterval(() => {
+        let next = currentMinutes + (SPEED_MAP[parseInt(speedSlider.value)] || 5);
+        const max = parseInt(timeSlider.max);
+        if (next >= max) { next = max; stopPlayback(); }
+        timeSlider.value = next;
+        updateTime();
+      }, TICK_MS);
+    }
+    function stopPlayback() {
+      playing = false;
+      playBtn.textContent = '▶'; playBtn.classList.remove('playing');
+      if (playInterval) { clearInterval(playInterval); playInterval = null; }
+    }
+    playBtn.addEventListener('click', () => { if (playing) stopPlayback(); else startPlayback(); });
+    resetBtn.addEventListener('click', () => { stopPlayback(); timeSlider.value = 0; updateTime(); });
+
+    // ── Init ────────────────────────────────────────────────────────
+    Promise.all([loadPatientList(), loadEvents()])
+      .then(([listData, events]) => {
+        patientListData = listData;
+        eventsData = events;
+        if (events) {
+          document.getElementById('demoControls').style.display = 'flex';
+          let maxMin = 0;
+          for (const pid of Object.keys(events)) maxMin = Math.max(maxMin, events[pid].max_minutes || 0);
+          timeSlider.max = maxMin;
+          timeSlider.value = 0;
+          currentMinutes = 0;
+          timeDisplay.textContent = fmtTime(0);
+        }
+        renderAll();
+      })
+      .catch(e => {
+        document.getElementById('summary').innerHTML = '';
+        document.getElementById('charts').innerHTML = '<div class="error">' + e.message + '</div>';
+      });
+  </script>
+</body>
+</html>

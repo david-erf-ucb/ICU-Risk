@@ -1,0 +1,59 @@
+{
+  "total_stays": 40,
+  "updated": "2026-02-24T12:00:00",
+  "model": "LR",
+  "threshold_high": 0.5,
+  "threshold_elevated": 0.2,
+  "tasks": {
+    "hosp_mort_24h_gap4h": {
+      "label": "In-hospital mortality",
+      "n_total": 36,
+      "n_high_risk": 7,
+      "n_elevated": 14,
+      "pct_high_risk": 19.4,
+      "median_risk": 0.249,
+      "distribution": [6, 9, 6, 4, 4, 2, 2, 0, 2, 1],
+      "bin_edges": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    },
+    "ARF_2h_gap4h": {
+      "label": "ARF (2h)",
+      "n_total": 17,
+      "n_high_risk": 8,
+      "n_elevated": 9,
+      "pct_high_risk": 47.1,
+      "median_risk": 0.487,
+      "distribution": [0, 0, 2, 5, 2, 5, 0, 1, 1, 1],
+      "bin_edges": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    },
+    "ARF_6h_gap4h": {
+      "label": "ARF (6h)",
+      "n_total": 14,
+      "n_high_risk": 5,
+      "n_elevated": 9,
+      "pct_high_risk": 35.7,
+      "median_risk": 0.48,
+      "distribution": [0, 0, 3, 1, 5, 2, 2, 1, 0, 0],
+      "bin_edges": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    },
+    "shock_2h_gap4h": {
+      "label": "Shock (2h)",
+      "n_total": 30,
+      "n_high_risk": 5,
+      "n_elevated": 23,
+      "pct_high_risk": 16.7,
+      "median_risk": 0.356,
+      "distribution": [0, 2, 6, 11, 6, 2, 2, 1, 0, 0],
+      "bin_edges": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    },
+    "shock_6h_gap4h": {
+      "label": "Shock (6h)",
+      "n_total": 29,
+      "n_high_risk": 9,
+      "n_elevated": 18,
+      "pct_high_risk": 31.0,
+      "median_risk": 0.385,
+      "distribution": [0, 2, 7, 8, 3, 7, 1, 1, 0, 0],
+      "bin_edges": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    }
+  }
+}

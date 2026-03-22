@@ -119,8 +119,9 @@ def filter_shock(args, vital):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Parser for Tranformer models")
 
-    parser.add_argument("--dataset_path", type=str, help="path to the dataset")
-    parser.add_argument("--dataset_path_cv", type=str, help="path to the dataset")
+    _default_data = os.path.join(os.path.dirname(__file__), "..", "output", "MIMIC_compile.npy")
+    parser.add_argument("--dataset_path", type=str, default=_default_data, help="path to compiled .npy (from compile_meep_to_npy.py)")
+    parser.add_argument("--dataset_path_cv", type=str, default=_default_data, help="path for cross-validation (same as dataset_path for single-DB)")
     parser.add_argument("--model_name", type=str, default='TCN', choices=['Trans', 'TCN', 'RNN'])
     parser.add_argument("--rnn_type", type=str, default='lstm', choices=['rnn', 'lstm', 'gru'])
 

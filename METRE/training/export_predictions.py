@@ -166,6 +166,8 @@ def main():
             "age": row.get("age", np.nan),
             "gender": row.get("gender", ""),
             "race": row.get("race", ""),
+            "admission_type": row.get("admission_type", ""),
+            "los_icu": row.get("los_icu", np.nan),
         }
 
     # Collect all stays that appear in any task's test set
@@ -208,17 +210,25 @@ def main():
 
         task_data[task_name] = (stay_ids_task, test_label, lr_prob, rf_prob)
 
-        # Metrics (precision/recall at threshold 0.5; log_loss = binary cross-entropy)
+        # Metrics (precision/recall at threshold 0.5; log_loss = binary cross-entropy; confusion matrix)
         def _metrics(y_true, y_prob, model_name):
             y_pred = (y_prob >= 0.5).astype(int)
+            tp = int(((y_true == 1) & (y_pred == 1)).sum())
+            fp = int(((y_true == 0) & (y_pred == 1)).sum())
+            tn = int(((y_true == 0) & (y_pred == 0)).sum())
+            fn = int(((y_true == 1) & (y_pred == 0)).sum())
             prec = precision_score(y_true, y_pred, zero_division=0)
             rec = recall_score(y_true, y_pred, zero_division=0)
-            # Clip probs to avoid log(0); sklearn log_loss expects (n_samples, 2) or probs
             eps = 1e-15
             p = np.clip(y_prob, eps, 1 - eps)
             bce = log_loss(y_true, np.column_stack([1 - p, p]), labels=[0, 1])
-            return {"task": task_name, "model": model_name, "auc": roc_auc_score(y_true, y_prob),
-                    "ap": average_precision_score(y_true, y_prob), "precision": prec, "recall": rec, "log_loss": bce}
+            return {
+                "task": task_name, "model": model_name,
+                "auc": roc_auc_score(y_true, y_prob),
+                "ap": average_precision_score(y_true, y_prob),
+                "precision": prec, "recall": rec, "log_loss": bce,
+                "tp": tp, "fp": fp, "tn": tn, "fn": fn,
+            }
 
         metrics_rows.append(_metrics(test_label, lr_prob, "LR"))
         metrics_rows.append(_metrics(test_label, rf_prob, "RF"))
@@ -238,6 +248,8 @@ def main():
             "age": info.get("age"),
             "gender": info.get("gender"),
             "race": info.get("race"),
+            "admission_type": info.get("admission_type"),
+            "los_icu": info.get("los_icu"),
         }
         for task_name in task_data:
             stay_ids_t, gt, lr_p, rf_p = task_data[task_name]
@@ -312,7 +324,7 @@ Test set is the held-out 20% from the 70/10/20 split (seed 41). No training or v
 
 ## Related Files
 
-- **test_metrics.csv**: Aggregate metrics (AUC, AP, precision, recall, log_loss) per task per model. Precision/recall use threshold 0.5. Log loss is binary cross-entropy.
+- **test_metrics.csv**: Aggregate metrics (AUC, AP, precision, recall, log_loss, tp, fp, tn, fn) per task per model. Precision/recall use threshold 0.5. Confusion matrix: tp=true positive, fp=false positive, tn=true negative, fn=false negative.
 - **test_population_summary.csv**: Test set class balance per task. Columns: task, n_total, n_positive, n_negative, pct_positive.
 """
     with open(dict_path, "w") as f:
