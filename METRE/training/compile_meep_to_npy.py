@@ -25,6 +25,11 @@ INV_COLS = [
     'phenylephrine', 'vasopressin', 'dobutamine', 'milrinone', 'heparin',
     'crrt', 'rbc_trans', 'platelets_trans', 'ffp_trans', 'colloid_bolus', 'crystalloid_bolus'
 ]
+# eICU uses different names; map to INV_COLS for consistent feature indices
+EICU_TO_MIMIC_INV = {
+    'antib': 'antibiotic', 'rbc': 'rbc_trans', 'platelets': 'platelets_trans',
+    'ffp': 'ffp_trans', 'colloid': 'colloid_bolus', 'crystalloid': 'crystalloid_bolus',
+}
 
 
 def _load_mimic(input_dir):
@@ -57,6 +62,9 @@ def _build_stay_arrays(vital, inv, database):
     Features = vital columns (184) + intervention columns (16) = 200.
     """
     stay_level_name = 'stay_id' if database == 'MIMIC' else 'patientunitstayid'
+
+    if database == 'eICU':
+        inv = inv.rename(columns=EICU_TO_MIMIC_INV)
 
     vital_cols = list(vital.columns)
     for c in INV_COLS:
@@ -95,13 +103,17 @@ def _build_static_arrays(static, stay_order, database):
     static_arrays = []
     for stay_id in stay_order:
         try:
-            if stay_level_name in static.index.names:
+            if isinstance(static.index, pd.MultiIndex) and stay_level_name in static.index.names:
                 row = static.xs(stay_id, level=stay_level_name)
             else:
                 row = static.loc[stay_id]
             if isinstance(row, pd.DataFrame):
                 row = row.iloc[0]
             val = row[mort_col] if mort_col in row.index else np.nan
+            try:
+                val = np.nan if pd.isna(val) else float(val)
+            except (TypeError, ValueError):
+                val = np.nan
             static_arrays.append(np.array([val], dtype=np.float32))
         except (KeyError, IndexError):
             static_arrays.append(np.array([np.nan], dtype=np.float32))

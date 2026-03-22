@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings — ICU Case Load</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 24px; background: #f5f5f5; color: #333; }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 4px 0; }
+    .subtitle { color: #666; font-size: 0.9rem; margin-bottom: 24px; }
+    .tabs { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 1px solid #ddd; }
+    .tabs a { padding: 10px 20px; color: #666; text-decoration: none; font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .tabs a:hover { color: #333; }
+    .tabs a.active { color: #1976d2; border-bottom-color: #1976d2; }
+    .card { background: #fff; border-radius: 10px; padding: 24px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border: 1px solid #e0e0e0; }
+    .card h2 { margin: 0 0 8px 0; font-size: 1.1rem; font-weight: 600; }
+    .card p { color: #666; font-size: 0.9rem; margin: 0 0 20px 0; }
+    .slider-group { margin-bottom: 24px; }
+    .slider-label { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+    .slider-label label { font-weight: 500; font-size: 0.95rem; }
+    .slider-value { font-size: 1.1rem; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 48px; text-align: right; }
+    .slider-value.high { color: #f44336; }
+    .slider-value.elevated { color: #ff9800; }
+    input[type="range"] { width: 100%; accent-color: #1976d2; height: 6px; cursor: pointer; }
+    .slider-ticks { display: flex; justify-content: space-between; font-size: 0.75rem; color: #999; margin-top: 4px; }
+    .preview-chart { position: relative; height: 140px; margin-top: 16px; }
+    .legend { display: flex; gap: 16px; margin-top: 12px; font-size: 0.85rem; }
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .legend-swatch { width: 14px; height: 14px; border-radius: 3px; }
+    .actions { display: flex; gap: 12px; margin-top: 20px; }
+    .btn { padding: 10px 20px; border-radius: 6px; font-size: 0.9rem; font-weight: 500; cursor: pointer; border: 1px solid #ddd; }
+    .btn-primary { background: #1976d2; color: #fff; border-color: #1976d2; }
+    .btn-primary:hover { background: #1565c0; }
+    .btn-secondary { background: #fff; color: #666; }
+    .btn-secondary:hover { background: #f5f5f5; }
+    .saved-msg { color: #4caf50; font-weight: 500; font-size: 0.9rem; opacity: 0; transition: opacity 0.3s; }
+    .saved-msg.show { opacity: 1; }
+    .tradeoff { background: #fafafa; border-radius: 8px; padding: 16px; margin-top: 16px; font-size: 0.85rem; color: #555; line-height: 1.5; }
+    .tradeoff strong { color: #333; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <nav class="tabs">
+      <a href="index.html">Summary</a>
+      <a href="patient_list.html">Patient List</a>
+      <a href="settings.html" class="active">Settings</a>
+    </nav>
+
+    <h1>Alert Thresholds</h1>
+    <p class="subtitle">Tune the risk thresholds to balance sensitivity and specificity for your unit.</p>
+
+    <div class="card">
+      <h2>Risk Classification</h2>
+      <p>Patients are classified into three tiers based on predicted risk probability. Adjust the thresholds below to control how aggressively the system flags patients.</p>
+
+      <div class="slider-group">
+        <div class="slider-label">
+          <label for="highSlider">High risk threshold</label>
+          <span class="slider-value high" id="highValue">0.50</span>
+        </div>
+        <input type="range" id="highSlider" min="0.10" max="0.90" step="0.05" value="0.50">
+        <div class="slider-ticks"><span>10%</span><span>30%</span><span>50%</span><span>70%</span><span>90%</span></div>
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-label">
+          <label for="elevatedSlider">Elevated risk threshold</label>
+          <span class="slider-value elevated" id="elevatedValue">0.20</span>
+        </div>
+        <input type="range" id="elevatedSlider" min="0.05" max="0.50" step="0.05" value="0.20">
+        <div class="slider-ticks"><span>5%</span><span>15%</span><span>25%</span><span>35%</span><span>50%</span></div>
+      </div>
+
+      <div class="tradeoff">
+        <strong>Lower thresholds</strong> = more alerts, fewer missed cases (higher sensitivity, more false positives).<br>
+        <strong>Higher thresholds</strong> = fewer alerts, more focused (higher specificity, risk of missed cases).
+      </div>
+
+      <div style="margin-top: 20px;">
+        <h3 style="font-size: 0.95rem; margin: 0 0 4px 0;">Preview: Mortality Risk Distribution</h3>
+        <div class="preview-chart"><canvas id="previewChart"></canvas></div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-swatch" style="background: #4caf50;"></div> Low</div>
+          <div class="legend-item"><div class="legend-swatch" style="background: #ff9800;"></div> Elevated</div>
+          <div class="legend-item"><div class="legend-swatch" style="background: #f44336;"></div> High</div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary" id="saveBtn">Save</button>
+        <button class="btn btn-secondary" id="resetBtn">Reset to defaults</button>
+        <span class="saved-msg" id="savedMsg">Saved</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'metre_settings';
+    const DEFAULTS = { threshold_high: 0.5, threshold_elevated: 0.2 };
+    const BIN_LABELS = ['0-10%','10-20%','20-30%','30-40%','40-50%','50-60%','60-70%','70-80%','80-90%','90-100%'];
+
+    function loadSettings() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) return { ...DEFAULTS, ...JSON.parse(raw) };
+      } catch (_) {}
+      return { ...DEFAULTS };
+    }
+
+    function saveSettings(s) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+    }
+
+    const highSlider = document.getElementById('highSlider');
+    const elevatedSlider = document.getElementById('elevatedSlider');
+    const highValue = document.getElementById('highValue');
+    const elevatedValue = document.getElementById('elevatedValue');
+
+    let previewChart = null;
+    let summaryData = null;
+
+    function updateDisplay() {
+      const h = parseFloat(highSlider.value);
+      const e = parseFloat(elevatedSlider.value);
+      highValue.textContent = h.toFixed(2);
+      elevatedValue.textContent = e.toFixed(2);
+      if (parseFloat(elevatedSlider.max) !== h) {
+        elevatedSlider.max = h.toFixed(2);
+        if (e > h) elevatedSlider.value = h.toFixed(2);
+      }
+      updatePreview(h, e);
+    }
+
+    function updatePreview(threshHigh, threshElev) {
+      if (!summaryData) return;
+      const task = summaryData.tasks.hosp_mort_24h_gap4h;
+      if (!task) return;
+      const dist = task.distribution;
+      const edges = task.bin_edges;
+      const colors = dist.map((_, i) => {
+        const midpoint = (edges[i] + edges[i + 1]) / 2;
+        if (midpoint >= threshHigh) return 'rgba(244, 67, 54, 0.8)';
+        if (midpoint >= threshElev) return 'rgba(255, 152, 0, 0.8)';
+        return 'rgba(76, 175, 80, 0.8)';
+      });
+      if (previewChart) {
+        previewChart.data.datasets[0].backgroundColor = colors;
+        previewChart.update('none');
+      } else {
+        const ctx = document.getElementById('previewChart').getContext('2d');
+        previewChart = new Chart(ctx, {
+          type: 'bar',
+          data: { labels: BIN_LABELS, datasets: [{ data: dist, backgroundColor: colors }] },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: {
+              y: { beginAtZero: true, title: { display: true, text: 'Patients' } },
+              x: { title: { display: true, text: 'Risk score' } }
+            },
+            plugins: { legend: { display: false } }
+          }
+        });
+      }
+    }
+
+    async function loadSummary() {
+      try {
+        const r = await fetch('dashboard_summary.json');
+        if (r.ok) return await r.json();
+      } catch (_) {}
+      const el = document.getElementById('embeddedData');
+      if (el) return JSON.parse(el.textContent);
+      return null;
+    }
+
+    highSlider.addEventListener('input', updateDisplay);
+    elevatedSlider.addEventListener('input', updateDisplay);
+
+    document.getElementById('saveBtn').addEventListener('click', () => {
+      saveSettings({
+        threshold_high: parseFloat(highSlider.value),
+        threshold_elevated: parseFloat(elevatedSlider.value)
+      });
+      const msg = document.getElementById('savedMsg');
+      msg.classList.add('show');
+      setTimeout(() => msg.classList.remove('show'), 2000);
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      highSlider.value = DEFAULTS.threshold_high;
+      elevatedSlider.value = DEFAULTS.threshold_elevated;
+      updateDisplay();
+      saveSettings(DEFAULTS);
+    });
+
+    const saved = loadSettings();
+    highSlider.value = saved.threshold_high;
+    elevatedSlider.value = saved.threshold_elevated;
+
+    loadSummary().then(data => {
+      summaryData = data;
+      updateDisplay();
+    });
+  </script>
+</body>
+</html>

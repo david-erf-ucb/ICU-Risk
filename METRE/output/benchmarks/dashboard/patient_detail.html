@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Patient Detail — ICU Case Load</title>
+  <script>
+    var id = (new URLSearchParams(window.location.search)).get('id');
+    if (id) { window.location.replace('patient_list.html#' + id); }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 24px; background: #f5f5f5; color: #333; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .tabs { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 1px solid #ddd; }
+    .tabs a { padding: 10px 20px; color: #666; text-decoration: none; font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .tabs a:hover { color: #333; }
+    .tabs a.active { color: #1976d2; border-bottom-color: #1976d2; }
+    header { margin-bottom: 24px; }
+    h1 { font-size: 1.5rem; font-weight: 600; margin: 0; }
+    .back { font-size: 0.9rem; margin-top: 8px; }
+    a { color: #1976d2; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .section { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .section h2 { margin: 0 0 16px 0; font-size: 1.1rem; font-weight: 600; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #eee; font-size: 0.9rem; }
+    th { background: #f5f5f5; font-weight: 600; }
+    .chart-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-top: 16px; }
+    .chart-box { background: #fafafa; border-radius: 8px; padding: 16px; }
+    .chart-box h3 { margin: 0 0 12px 0; font-size: 0.95rem; }
+    .chart-container { height: 120px; position: relative; }
+    .error { background: #ffebee; color: #c62828; padding: 16px; border-radius: 8px; }
+    .empty { color: #888; font-style: italic; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <nav class="tabs">
+      <a href="index.html">Summary</a>
+      <a href="patient_list.html">Patient List</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+    <header>
+      <h1 id="title">Patient Detail</h1>
+      <p class="back"><a href="patient_list.html">← Back to patient list</a></p>
+    </header>
+
+    <div id="content"></div>
+  </div>
+
+  <script>
+    const VITAL_LABELS = {
+      heart_rate: 'Heart rate (bpm)',
+      sbp: 'SBP (mmHg)', dbp: 'DBP (mmHg)', mbp: 'MBP (mmHg)',
+      resp_rate: 'Resp rate (/min)',
+      temperature: 'Temp (°C)',
+      glucose: 'Glucose',
+      spo2: 'SpO2 (%)',
+    };
+    const INV_LABELS = {
+      vent: 'Ventilation',
+      antibiotic: 'Antibiotics',
+      dopamine: 'Dopamine',
+      epinephrine: 'Epinephrine',
+      norepinephrine: 'Norepinephrine',
+      phenylephrine: 'Phenylephrine',
+      vasopressin: 'Vasopressin',
+      dobutamine: 'Dobutamine',
+      milrinone: 'Milrinone',
+      heparin: 'Heparin',
+      crrt: 'CRRT',
+      rbc_trans: 'RBC transfusion',
+      platelets_trans: 'Platelets',
+      ffp_trans: 'FFP',
+      colloid_bolus: 'Colloid bolus',
+      crystalloid_bolus: 'Crystalloid bolus',
+    };
+
+    function getPatientId() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('id') || '';
+    }
+
+    async function load() {
+      try { const r = await fetch('patient_detail.json'); if (r.ok) return await r.json(); } catch (_) {}
+      return null;
+    }
+
+    function render(detail, pid) {
+      document.getElementById('title').textContent = `Patient ${pid} — Vitals & Interventions`;
+      const v = detail.vitals || [];
+      const inv = detail.interventions || [];
+
+      let html = '';
+      const vitalKeys = v.length > 0 ? Object.keys(VITAL_LABELS).filter(k => v.some(r => r[k] != null)) : [];
+      if (v.length > 0) {
+        if (vitalKeys.length > 0) {
+          html += '<div class="section"><h2>Vitals over time</h2><div class="chart-row">';
+          vitalKeys.forEach(key => {
+            const id = 'chart_' + key.replace(/_/g, '-');
+            html += `<div class="chart-box"><h3>${VITAL_LABELS[key] || key}</h3><div class="chart-container"><canvas id="${id}"></canvas></div></div>`;
+          });
+          html += '</div></div>';
+        }
+        html += '<div class="section"><h2>Vitals table</h2><table><thead><tr><th>Hour</th>';
+        const tableVitalKeys = vitalKeys.length ? vitalKeys : Object.keys(VITAL_LABELS);
+        tableVitalKeys.forEach(k => html += `<th>${VITAL_LABELS[k] || k}</th>`);
+        html += '</tr></thead><tbody>';
+        v.forEach(row => {
+          html += `<tr><td>${row.hour}</td>`;
+          tableVitalKeys.forEach(k => html += `<td>${row[k] != null ? row[k] : '—'}</td>`);
+          html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+      } else {
+        html += '<div class="section"><h2>Vitals</h2><p class="empty">No vital data available.</p></div>';
+      }
+
+      if (inv.length > 0) {
+        const invKeys = Object.keys(INV_LABELS).filter(k => inv.some(r => r[k] === 1));
+        html += '<div class="section"><h2>Interventions</h2><table><thead><tr><th>Hour</th>';
+        invKeys.forEach(k => html += `<th>${INV_LABELS[k] || k}</th>`);
+        html += '</tr></thead><tbody>';
+        inv.forEach(row => {
+          html += `<tr><td>${row.hour}</td>`;
+          invKeys.forEach(k => html += `<td>${row[k] === 1 ? 'Yes' : '—'}</td>`);
+          html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+      } else {
+        html += '<div class="section"><h2>Interventions</h2><p class="empty">No intervention data available.</p></div>';
+      }
+
+      document.getElementById('content').innerHTML = html;
+
+      if (v.length > 0) {
+        const vitalKeys2 = Object.keys(VITAL_LABELS).filter(k => v.some(r => r[k] != null));
+        vitalKeys2.forEach(key => {
+          const ctx = document.getElementById('chart_' + key.replace(/_/g, '-'));
+          if (!ctx) return;
+          const data = v.map(r => ({ x: r.hour, y: r[key] })).filter(d => d.y != null);
+          new Chart(ctx.getContext('2d'), {
+            type: 'line',
+            data: { datasets: [{ label: VITAL_LABELS[key], data, borderColor: '#1976d2', backgroundColor: 'rgba(25,118,210,0.1)', fill: true }] },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              scales: { x: { type: 'linear', title: { display: true, text: 'Hour' } }, y: { beginAtZero: false } },
+              plugins: { legend: { display: false } }
+            }
+          });
+        });
+      }
+    }
+
+    const pid = getPatientId();
+    if (!pid) {
+      document.getElementById('content').innerHTML = '<div class="error">No patient ID. Use ?id=P001 in the URL or click a patient from the list.</div>';
+    } else {
+      load().then(data => {
+        const detail = data && data[pid];
+        if (detail) {
+          render(detail, pid);
+        } else {
+          document.getElementById('content').innerHTML = '<div class="error">Patient ' + pid + ' not found. Run: python training/export_dashboard_data.py --patient-detail</div>';
+        }
+      });
+    }
+  </script>
+</body>
+</html>

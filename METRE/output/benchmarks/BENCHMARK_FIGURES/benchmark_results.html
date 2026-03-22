@@ -9,6 +9,22 @@
     h1 { color: #333; }
     .chart-container { position: relative; height: 350px; margin: 30px 0; }
     .chart-wrapper { margin-bottom: 40px; }
+    .confusion-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; }
+    .confusion-card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; }
+    .confusion-card h3 { margin: 0 0 8px 0; font-size: 14px; }
+    .confusion-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .confusion-table th, .confusion-table td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+    .confusion-table th { background: #f5f5f5; }
+    .confusion-table .tn { background: #e8f5e9; }
+    .confusion-table .fp { background: #ffebee; }
+    .confusion-table .fn { background: #fff3e0; }
+    .confusion-table .tp { background: #e3f2fd; }
+    .threshold-section { margin-bottom: 32px; }
+    .threshold-section h3 { margin: 0 0 12px 0; font-size: 16px; }
+    .threshold-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 24px; }
+    .threshold-table th, .threshold-table td { border: 1px solid #ccc; padding: 6px; text-align: right; }
+    .threshold-table th { background: #f5f5f5; }
+    .threshold-table th:first-child, .threshold-table td:first-child { text-align: left; }
   </style>
 </head>
 <body>
@@ -18,6 +34,22 @@
   <div class="chart-wrapper">
     <h2>Test AUC by Task and Model</h2>
     <div class="chart-container"><canvas id="aucChart"></canvas></div>
+  </div>
+
+  <div class="chart-wrapper">
+    <h2>MIMIC vs eICU Cross-Database Validation</h2>
+    <p>Models trained on MIMIC, evaluated on eICU test set (20% of eICU stays). Δ = eICU AUC − MIMIC AUC.</p>
+    <div class="chart-container"><canvas id="mimicEicuChart"></canvas></div>
+    <table class="threshold-table" style="margin-top: 20px;">
+      <thead><tr><th>Task</th><th>MIMIC LR</th><th>MIMIC RF</th><th>eICU LR</th><th>eICU RF</th><th>Δ LR</th><th>Δ RF</th></tr></thead>
+      <tbody>
+        <tr><td>hosp_mort_24h</td><td>0.809</td><td>0.841</td><td>0.553</td><td>0.718</td><td>−0.26</td><td>−0.12</td></tr>
+        <tr><td>ARF_2h</td><td>0.661</td><td>0.693</td><td>0.524</td><td>0.523</td><td>−0.14</td><td>−0.17</td></tr>
+        <tr><td>ARF_6h</td><td>0.639</td><td>0.659</td><td>0.526</td><td>0.519</td><td>−0.11</td><td>−0.14</td></tr>
+        <tr><td>shock_2h</td><td>0.674</td><td>0.700</td><td>0.487</td><td>0.561</td><td>−0.19</td><td>−0.14</td></tr>
+        <tr><td>shock_6h</td><td>0.670</td><td>0.677</td><td>0.484</td><td>0.563</td><td>−0.19</td><td>−0.11</td></tr>
+      </tbody>
+    </table>
   </div>
 
   <div class="chart-wrapper">
@@ -33,6 +65,69 @@
   <div class="chart-wrapper">
     <h2>Precision vs Recall (threshold 0.5)</h2>
     <div class="chart-container"><canvas id="prChart"></canvas></div>
+  </div>
+
+  <div class="chart-wrapper">
+    <h2>Confusion Matrices (threshold 0.5)</h2>
+    <p>TP=true positive, FP=false positive, TN=true negative, FN=false negative</p>
+    <div id="confusionTables"></div>
+  </div>
+
+  <div class="chart-wrapper">
+    <h2>Precision and Recall by Threshold</h2>
+    <p>Thresholds 0.05, 0.10, …, 0.50 (step 0.05). Rows = tasks; columns = thresholds.</p>
+    <div class="threshold-section">
+      <h3>LR Precision</h3>
+      <table class="threshold-table">
+        <thead><tr><th>Task</th><th>0.05</th><th>0.10</th><th>0.15</th><th>0.20</th><th>0.25</th><th>0.30</th><th>0.35</th><th>0.40</th><th>0.45</th><th>0.50</th></tr></thead>
+        <tbody>
+          <tr><td>hosp_mort_24h</td><td>0.100</td><td>0.110</td><td>0.121</td><td>0.133</td><td>0.146</td><td>0.160</td><td>0.177</td><td>0.193</td><td>0.210</td><td>0.232</td></tr>
+          <tr><td>ARF_2h</td><td>0.369</td><td>0.369</td><td>0.370</td><td>0.370</td><td>0.374</td><td>0.388</td><td>0.399</td><td>0.436</td><td>0.479</td><td>0.516</td></tr>
+          <tr><td>ARF_6h</td><td>0.270</td><td>0.270</td><td>0.270</td><td>0.272</td><td>0.275</td><td>0.282</td><td>0.293</td><td>0.312</td><td>0.341</td><td>0.361</td></tr>
+          <tr><td>shock_2h</td><td>0.100</td><td>0.100</td><td>0.101</td><td>0.102</td><td>0.107</td><td>0.113</td><td>0.125</td><td>0.140</td><td>0.158</td><td>0.168</td></tr>
+          <tr><td>shock_6h</td><td>0.068</td><td>0.068</td><td>0.069</td><td>0.072</td><td>0.075</td><td>0.081</td><td>0.086</td><td>0.094</td><td>0.105</td><td>0.118</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="threshold-section">
+      <h3>LR Recall</h3>
+      <table class="threshold-table">
+        <thead><tr><th>Task</th><th>0.05</th><th>0.10</th><th>0.15</th><th>0.20</th><th>0.25</th><th>0.30</th><th>0.35</th><th>0.40</th><th>0.45</th><th>0.50</th></tr></thead>
+        <tbody>
+          <tr><td>hosp_mort_24h</td><td>0.990</td><td>0.978</td><td>0.957</td><td>0.940</td><td>0.905</td><td>0.861</td><td>0.835</td><td>0.785</td><td>0.733</td><td>0.676</td></tr>
+          <tr><td>ARF_2h</td><td>0.999</td><td>0.999</td><td>0.998</td><td>0.993</td><td>0.982</td><td>0.961</td><td>0.890</td><td>0.783</td><td>0.645</td><td>0.519</td></tr>
+          <tr><td>ARF_6h</td><td>0.998</td><td>0.997</td><td>0.994</td><td>0.983</td><td>0.968</td><td>0.925</td><td>0.866</td><td>0.780</td><td>0.683</td><td>0.541</td></tr>
+          <tr><td>shock_2h</td><td>1.000</td><td>1.000</td><td>1.000</td><td>0.990</td><td>0.982</td><td>0.932</td><td>0.857</td><td>0.764</td><td>0.669</td><td>0.540</td></tr>
+          <tr><td>shock_6h</td><td>1.000</td><td>0.996</td><td>0.987</td><td>0.972</td><td>0.936</td><td>0.891</td><td>0.820</td><td>0.736</td><td>0.655</td><td>0.573</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="threshold-section">
+      <h3>RF Precision</h3>
+      <table class="threshold-table">
+        <thead><tr><th>Task</th><th>0.05</th><th>0.10</th><th>0.15</th><th>0.20</th><th>0.25</th><th>0.30</th><th>0.35</th><th>0.40</th><th>0.45</th><th>0.50</th></tr></thead>
+        <tbody>
+          <tr><td>hosp_mort_24h</td><td>0.140</td><td>0.205</td><td>0.270</td><td>0.329</td><td>0.378</td><td>0.421</td><td>0.514</td><td>0.583</td><td>0.642</td><td>0.674</td></tr>
+          <tr><td>ARF_2h</td><td>0.370</td><td>0.371</td><td>0.383</td><td>0.402</td><td>0.429</td><td>0.468</td><td>0.509</td><td>0.547</td><td>0.595</td><td>0.645</td></tr>
+          <tr><td>ARF_6h</td><td>0.269</td><td>0.273</td><td>0.287</td><td>0.311</td><td>0.345</td><td>0.403</td><td>0.458</td><td>0.489</td><td>0.527</td><td>0.547</td></tr>
+          <tr><td>shock_2h</td><td>0.128</td><td>0.174</td><td>0.223</td><td>0.263</td><td>0.274</td><td>0.282</td><td>0.282</td><td>0.277</td><td>0.274</td><td>0.256</td></tr>
+          <tr><td>shock_6h</td><td>0.093</td><td>0.132</td><td>0.144</td><td>0.206</td><td>0.214</td><td>0.154</td><td>0.200</td><td>0.188</td><td>0.214</td><td>0.182</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="threshold-section">
+      <h3>RF Recall</h3>
+      <table class="threshold-table">
+        <thead><tr><th>Task</th><th>0.05</th><th>0.10</th><th>0.15</th><th>0.20</th><th>0.25</th><th>0.30</th><th>0.35</th><th>0.40</th><th>0.45</th><th>0.50</th></tr></thead>
+        <tbody>
+          <tr><td>hosp_mort_24h</td><td>0.956</td><td>0.868</td><td>0.690</td><td>0.487</td><td>0.324</td><td>0.215</td><td>0.142</td><td>0.094</td><td>0.055</td><td>0.039</td></tr>
+          <tr><td>ARF_2h</td><td>1.000</td><td>0.993</td><td>0.982</td><td>0.945</td><td>0.872</td><td>0.756</td><td>0.619</td><td>0.493</td><td>0.387</td><td>0.311</td></tr>
+          <tr><td>ARF_6h</td><td>1.000</td><td>0.995</td><td>0.964</td><td>0.851</td><td>0.679</td><td>0.495</td><td>0.323</td><td>0.166</td><td>0.074</td><td>0.044</td></tr>
+          <tr><td>shock_2h</td><td>0.869</td><td>0.644</td><td>0.411</td><td>0.285</td><td>0.218</td><td>0.197</td><td>0.182</td><td>0.165</td><td>0.151</td><td>0.135</td></tr>
+          <tr><td>shock_6h</td><td>0.828</td><td>0.388</td><td>0.109</td><td>0.047</td><td>0.019</td><td>0.009</td><td>0.009</td><td>0.006</td><td>0.006</td><td>0.004</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <script>
@@ -53,6 +148,22 @@
         ]
       },
       options: { scales: { y: { min: 0.5, max: 0.9 } }, plugins: { legend: {} } }
+    });
+
+    const mimicAuc = { LR: [0.809, 0.661, 0.639, 0.674, 0.670], RF: [0.841, 0.693, 0.659, 0.700, 0.677] };
+    const eicuAuc = { LR: [0.553, 0.524, 0.526, 0.487, 0.484], RF: [0.718, 0.523, 0.519, 0.561, 0.563] };
+    new Chart(document.getElementById('mimicEicuChart'), {
+      type: 'bar',
+      data: {
+        labels: tasks,
+        datasets: [
+          { label: 'MIMIC LR', data: mimicAuc.LR, backgroundColor: 'rgba(70, 130, 180, 0.9)' },
+          { label: 'MIMIC RF', data: mimicAuc.RF, backgroundColor: 'rgba(255, 127, 80, 0.9)' },
+          { label: 'eICU LR', data: eicuAuc.LR, backgroundColor: 'rgba(70, 130, 180, 0.4)' },
+          { label: 'eICU RF', data: eicuAuc.RF, backgroundColor: 'rgba(255, 127, 80, 0.4)' }
+        ]
+      },
+      options: { scales: { y: { min: 0.45, max: 0.9 } }, plugins: { legend: {} } }
     });
 
     new Chart(document.getElementById('balanceChart'), {
@@ -89,6 +200,27 @@
         plugins: { legend: {}, tooltip: { callbacks: { label: c => tasks[c.dataIndex] + ': ' + c.parsed.x.toFixed(2) + ', ' + c.parsed.y.toFixed(2) } } }
       }
     });
+
+    // Confusion matrices: { task: { LR: {tp,fp,tn,fn}, RF: {...} } }
+    const confusion = {
+      hosp_mort_24h: { LR: {tp:532,fp:1765,tn:6184,fn:255}, RF: {tp:31,fp:15,tn:7934,fn:756} },
+      ARF_2h: { LR: {tp:546,fp:512,tn:1289,fn:507}, RF: {tp:327,fp:180,tn:1621,fn:726} },
+      ARF_6h: { LR: {tp:359,fp:635,tn:1166,fn:304}, RF: {tp:29,fp:24,tn:1777,fn:634} },
+      shock_2h: { LR: {tp:389,fp:1932,tn:4529,fn:331}, RF: {tp:97,fp:282,tn:6179,fn:623} },
+      shock_6h: { LR: {tp:267,fp:1994,tn:4467,fn:199}, RF: {tp:2,fp:9,tn:6452,fn:464} }
+    };
+    const container = document.getElementById('confusionTables');
+    container.innerHTML = '<div class="confusion-grid">' + tasks.flatMap(t =>
+      ['LR','RF'].map(m => {
+        const c = confusion[t][m];
+        return `<div class="confusion-card"><h3>${t} — ${m}</h3>
+          <table class="confusion-table">
+            <tr><th></th><th>Predicted 0</th><th>Predicted 1</th></tr>
+            <tr><th>Actual 0</th><td class="tn">TN ${c.tn}</td><td class="fp">FP ${c.fp}</td></tr>
+            <tr><th>Actual 1</th><td class="fn">FN ${c.fn}</td><td class="tp">TP ${c.tp}</td></tr>
+          </table></div>`;
+      })
+    ).join('') + '</div>';
   </script>
 </body>
 </html>

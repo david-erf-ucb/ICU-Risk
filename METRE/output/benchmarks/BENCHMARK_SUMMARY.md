@@ -299,6 +299,8 @@ Models trained on MIMIC were evaluated on the eICU test set (20% of eICU stays, 
 **Interactive HTML (open in browser):** `BENCHMARK_FIGURES/benchmark_results.html`  
 Charts: AUC by task, class balance, % positive, precision vs recall, confusion matrices (TP/FP/TN/FN).
 
+**ICU Case Load Dashboard:** `dashboard/index.html` — Summary for admins/clinicians: total stays, high-risk counts (mortality, ARF, shock), risk distribution. Run `python training/export_dashboard_data.py` to generate data.
+
 **Static PNGs (optional):** Run `python training/plot_benchmark_results.py` to generate:
 - `auc_by_task.png` — AUC by task and model
 - `class_balance.png` — Class balance (n_pos, n_neg) by task

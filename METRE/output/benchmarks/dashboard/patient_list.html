@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Patient List — ICU Case Load</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 24px; background: #f5f5f5; color: #333; }
+    .container { max-width: 1400px; margin: 0 auto; }
+    header { margin-bottom: 20px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    h1 { font-size: 1.5rem; font-weight: 600; margin: 0; }
+    a { color: #1976d2; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #eee; font-size: 0.82rem; }
+    th { background: #f5f5f5; font-weight: 600; font-size: 0.8rem; white-space: nowrap; }
+    tr:hover { background: #fafafa; }
+    .risk-low { background: #e8f5e9; }
+    .risk-elevated { background: #fff9c4; }
+    .risk-high { background: #ffcdd2; }
+    .risk-na { background: #f5f5f5; color: #999; }
+    .risk-cell { font-weight: 500; min-width: 50px; text-align: center; }
+    .vital-cell { text-align: center; font-variant-numeric: tabular-nums; }
+    .vital-warn { color: #f44336; font-weight: 600; }
+    .vital-caution { color: #ff9800; font-weight: 500; }
+    .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; margin: 1px; }
+    .badge-vent { background: #e3f2fd; color: #1565c0; }
+    .badge-vaso { background: #fce4ec; color: #c62828; }
+    .badge-abx { background: #fff3e0; color: #e65100; }
+    .badge-discharged { background: #e0e0e0; color: #666; font-size: 0.75rem; padding: 2px 8px; }
+    .meta { margin-top: 16px; font-size: 0.8rem; color: #888; }
+    .error { background: #ffebee; color: #c62828; padding: 16px; border-radius: 8px; margin: 20px 0; }
+    .tabs { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 1px solid #ddd; }
+    .tabs a { padding: 10px 20px; color: #666; text-decoration: none; font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .tabs a:hover { color: #333; }
+    .tabs a.active { color: #1976d2; border-bottom-color: #1976d2; }
+    .pagination { display: flex; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+    .pagination button { padding: 8px 14px; border: 1px solid #ddd; background: #fff; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
+    .pagination button:hover:not(:disabled) { background: #f5f5f5; border-color: #1976d2; color: #1976d2; }
+    .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .pagination .page-info { font-size: 0.9rem; color: #666; }
+    .pagination .page-nums { display: flex; gap: 4px; }
+    .pagination .page-num { padding: 6px 10px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+    .pagination .page-num:hover { background: #f0f0f0; }
+    .pagination .page-num.active { background: #1976d2; color: #fff; border-color: #1976d2; }
+    th.sortable { cursor: pointer; user-select: none; }
+    th.sortable:hover { color: #1976d2; }
+    th .sort-icon { font-size: 0.7em; opacity: 0.6; margin-left: 2px; }
+    .patient-link { color: #1976d2; cursor: pointer; text-decoration: none; font-weight: 500; }
+    .patient-link:hover { text-decoration: underline; }
+    .detail-panel { display: none; margin-top: 24px; background: #fff; border-radius: 10px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .detail-panel.visible { display: block; }
+    .detail-panel h2 { margin: 0 0 16px 0; font-size: 1.1rem; }
+    .detail-panel .close-btn { float: right; background: none; border: none; cursor: pointer; font-size: 1.2rem; color: #666; }
+    .detail-panel .close-btn:hover { color: #333; }
+    .detail-section { margin-top: 20px; }
+    .detail-section h3 { margin: 0 0 12px 0; font-size: 1rem; }
+    .detail-section table { font-size: 0.85rem; }
+    .chart-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 12px; }
+    .chart-box { background: #fafafa; border-radius: 8px; padding: 12px; }
+    .chart-box h4 { margin: 0 0 8px 0; font-size: 0.9rem; }
+    .chart-container { height: 100px; position: relative; }
+
+    .th-group { text-align: center; border-bottom: 2px solid #ddd; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; }
+
+    .demo-controls { background: #fff8e1; border: 2px dashed #ffb300; border-radius: 10px; padding: 12px 20px; margin-bottom: 20px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .demo-controls .demo-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: #f57f17; font-weight: 700; }
+    .demo-controls .play-btn { width: 40px; height: 40px; border-radius: 50%; border: 2px solid #f57f17; background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: #f57f17; transition: all 0.15s; }
+    .demo-controls .play-btn:hover { background: #fff8e1; }
+    .demo-controls .play-btn.playing { background: #f57f17; color: #fff; }
+    .demo-controls .speed-group { display: flex; align-items: center; gap: 8px; }
+    .demo-controls .speed-group label { font-size: 0.85rem; color: #666; white-space: nowrap; }
+    .demo-controls .speed-group input[type="range"] { width: 100px; accent-color: #f57f17; }
+    .demo-controls .speed-value { font-size: 0.85rem; font-weight: 600; color: #f57f17; min-width: 40px; font-variant-numeric: tabular-nums; }
+    .demo-controls .reset-btn { padding: 6px 14px; border: 1px solid #ffb300; background: #fff; border-radius: 6px; cursor: pointer; font-size: 0.8rem; color: #f57f17; font-weight: 500; }
+    .demo-controls .reset-btn:hover { background: #fff8e1; }
+    .demo-controls .time-row { display: flex; align-items: center; gap: 12px; width: 100%; }
+    .demo-controls .time-row input[type="range"] { flex: 1; min-width: 200px; accent-color: #f57f17; }
+    .demo-elapsed { font-size: 0.8rem; color: #888; white-space: nowrap; }
+
+    .app-clock { font-size: 1.1rem; font-weight: 600; color: #1976d2; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .app-stats { font-size: 0.85rem; color: #666; margin-top: 2px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <nav class="tabs">
+      <a href="index.html">Summary</a>
+      <a href="patient_list.html" class="active">Patient List</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+    <header>
+      <div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;">
+        <h1>Patient List</h1>
+        <div class="app-clock" id="demoClock">Jan 15, 2024 8:00 AM</div>
+      </div>
+      <div class="app-stats" id="timeStats"></div>
+    </header>
+
+    <div class="demo-controls">
+      <span class="demo-label">Demo</span>
+      <button class="play-btn" id="playBtn" title="Play / Pause">▶</button>
+      <div class="speed-group">
+        <label for="speedSlider">Speed</label>
+        <input type="range" id="speedSlider" min="1" max="5" step="1" value="2">
+        <span class="speed-value" id="speedValue">5x</span>
+      </div>
+      <button class="reset-btn" id="resetBtn">Reset</button>
+      <span class="demo-elapsed" id="timeDisplay">(+0:00)</span>
+      <div class="time-row">
+        <input type="range" id="timeSlider" min="0" max="14400" step="1" value="0">
+      </div>
+    </div>
+
+    <div id="table-wrap"></div>
+    <div id="pagination" class="pagination"></div>
+    <div id="detail-panel" class="detail-panel"></div>
+    <p class="meta" id="meta"></p>
+  </div>
+
+  <script>
+    const PAGE_SIZE = 20;
+    const STORAGE_KEY = 'metre_settings';
+    const DEFAULTS = { threshold_high: 0.5, threshold_elevated: 0.2 };
+
+    function loadSettings() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) return { ...DEFAULTS, ...JSON.parse(raw) };
+      } catch (_) {}
+      return { ...DEFAULTS };
+    }
+
+    let settings = loadSettings();
+
+    const RISK_COLS = [
+      { key: 'hosp_mort_24h_gap4h', label: 'Mort' },
+      { key: 'ARF_2h_gap4h', label: 'ARF 2h' },
+      { key: 'ARF_6h_gap4h', label: 'ARF 6h' },
+      { key: 'shock_2h_gap4h', label: 'Shock 2h' },
+      { key: 'shock_6h_gap4h', label: 'Shock 6h' }
+    ];
+    const VITAL_COLS = [
+      { key: 'heart_rate', label: 'HR', unit: 'bpm', warnLow: 50, warnHigh: 120, cautionLow: 60, cautionHigh: 100 },
+      { key: 'sbp', label: 'SBP', unit: 'mmHg', warnLow: 80, warnHigh: 180, cautionLow: 90, cautionHigh: 160 },
+      { key: 'spo2', label: 'SpO2', unit: '%', warnLow: 88, warnHigh: null, cautionLow: 92, cautionHigh: null },
+      { key: 'resp_rate', label: 'RR', unit: '/m', warnLow: 8, warnHigh: 35, cautionLow: 10, cautionHigh: 28 },
+      { key: 'temperature', label: 'Temp', unit: '°C', warnLow: 35, warnHigh: 39.5, cautionLow: 36, cautionHigh: 38.5 },
+    ];
+    const INFO_COLS = [
+      { key: 'age', label: 'Age', sortable: true },
+      { key: 'gender', label: 'Sex', sortable: true },
+      { key: 'admission_type', label: 'Admit', sortable: true },
+      { key: 'los_icu', label: 'LOS(h)', sortable: true }
+    ];
+
+    function riskClass(v) {
+      if (v == null) return 'risk-na';
+      if (v >= settings.threshold_high) return 'risk-high';
+      if (v >= settings.threshold_elevated) return 'risk-elevated';
+      return 'risk-low';
+    }
+    function fmt(v) { return v == null ? '—' : (v * 100).toFixed(0) + '%'; }
+    const BASE_DATE = new Date(2024, 0, 15, 8, 0, 0);
+
+    function fmtTime(totalMinutes) {
+      const h = Math.floor(totalMinutes / 60);
+      const m = totalMinutes % 60;
+      return '+' + h + ':' + String(m).padStart(2, '0');
+    }
+
+    function fmtClock(totalMinutes) {
+      const d = new Date(BASE_DATE.getTime() + totalMinutes * 60000);
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const hh = d.getHours();
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      const ampm = hh >= 12 ? 'PM' : 'AM';
+      const h12 = hh % 12 || 12;
+      return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} ${h12}:${mm} ${ampm}`;
+    }
+
+    function vitalClass(val, col) {
+      if (val == null) return '';
+      if ((col.warnLow != null && val < col.warnLow) || (col.warnHigh != null && val > col.warnHigh)) return 'vital-warn';
+      if ((col.cautionLow != null && val < col.cautionLow) || (col.cautionHigh != null && val > col.cautionHigh)) return 'vital-caution';
+      return '';
+    }
+
+    async function loadPatientList() {
+      try { const r = await fetch('patient_list.json'); if (r.ok) return await r.json(); } catch (_) {}
+      const el = document.getElementById('embeddedData');
+      if (el) return JSON.parse(el.textContent);
+      throw new Error('No data.');
+    }
+
+    async function loadEvents() {
+      try { const r = await fetch('patient_events.json'); if (r.ok) return await r.json(); } catch (_) {}
+      return null;
+    }
+
+    // Given events up to time t, return latest vital values and active interventions
+    function snapshotAt(events, t) {
+      const vitals = {};
+      const activeInterventions = {};
+      if (!events) return { vitals, interventions: [] };
+      for (const e of events) {
+        if (e.t > t) break;
+        if (e.type === 'vital') {
+          vitals[e.name] = e.value;
+        } else if (e.type === 'intervention') {
+          if (e.value === 1) activeInterventions[e.name] = e.detail || true;
+          else delete activeInterventions[e.name];
+        }
+      }
+      return { vitals, interventions: Object.keys(activeInterventions) };
+    }
+
+    let currentPage = 1;
+    let patientsData = null;
+    let eventsData = null;
+    let sortKey = 'hosp_mort_24h_gap4h';
+    let sortDir = -1;
+    let currentMinutes = 14400;
+
+    function sortPatients(patients) {
+      return [...patients].sort((a, b) => {
+        let va = a[sortKey], vb = b[sortKey];
+        const aNull = va == null || (typeof va === 'number' && isNaN(va));
+        const bNull = vb == null || (typeof vb === 'number' && isNaN(vb));
+        if (aNull && bNull) return 0;
+        if (aNull) return 1;
+        if (bNull) return -1;
+        const isNum = typeof va === 'number' || typeof vb === 'number';
+        if (isNum) { va = Number(va); vb = Number(vb); }
+        if (va < vb) return -sortDir;
+        if (va > vb) return sortDir;
+        return 0;
+      });
+    }
+
+    function makeHeader(col, label) {
+      const isSort = sortKey === col;
+      const icon = isSort ? (sortDir === 1 ? ' ↑' : ' ↓') : '';
+      return `<th class="sortable" data-sort="${col}">${label}<span class="sort-icon">${icon}</span></th>`;
+    }
+
+    function render(data) {
+      patientsData = data;
+      settings = loadSettings();
+      const hasEvents = eventsData != null;
+      const sorted = sortPatients(data.patients);
+
+      let activePatients, dischargedCount = 0;
+      if (hasEvents) {
+        activePatients = sorted.filter(p => {
+          const losMinutes = (p.los_icu || 0) * 60;
+          const discharged = losMinutes > 0 && currentMinutes > losMinutes;
+          if (discharged) dischargedCount++;
+          return !discharged;
+        });
+      } else {
+        activePatients = sorted;
+      }
+
+      const total = activePatients.length;
+      const totalAll = sorted.length;
+      const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+      currentPage = Math.min(currentPage, totalPages);
+      const start = (currentPage - 1) * PAGE_SIZE;
+      const pagePatients = activePatients.slice(start, start + PAGE_SIZE);
+      const activeCount = total;
+
+      const infoHeaders = INFO_COLS.map(c => c.sortable ? makeHeader(c.key, c.label) : `<th>${c.label}</th>`).join('');
+      const vitalHeaders = hasEvents ? VITAL_COLS.map(c => `<th>${c.label}</th>`).join('') + '<th>Interventions</th>' : '';
+      const riskHeaders = RISK_COLS.map(c => makeHeader(c.key, c.label)).join('');
+
+      const groupHeaders = hasEvents
+        ? `<tr><th colspan="${1 + INFO_COLS.length}" class="th-group"></th><th colspan="${VITAL_COLS.length + 1}" class="th-group">Live Vitals</th><th colspan="${RISK_COLS.length}" class="th-group">Risk Scores</th></tr>`
+        : '';
+
+      const rows = pagePatients.map(p => {
+        const snapshot = hasEvents ? snapshotAt(eventsData[p.id]?.events, currentMinutes) : null;
+
+        const infoCells = INFO_COLS.map(c => {
+          const v = p[c.key];
+          let val = '—';
+          if (v != null) val = typeof v === 'number' ? (Number.isInteger(v) ? v : v.toFixed(1)) : String(v);
+          return `<td>${val}</td>`;
+        }).join('');
+
+        let vitalCells = '';
+        if (hasEvents) {
+          vitalCells = VITAL_COLS.map(c => {
+            const v = snapshot?.vitals[c.key];
+            if (v == null) return '<td class="vital-cell">—</td>';
+            const cls = vitalClass(v, c);
+            return `<td class="vital-cell ${cls}">${typeof v === 'number' ? (c.key === 'temperature' ? v.toFixed(1) : Math.round(v)) : v}</td>`;
+          }).join('');
+          const intv = snapshot?.interventions || [];
+          const badges = intv.map(name => {
+            if (name === 'vent') return '<span class="badge badge-vent">Vent</span>';
+            if (name === 'antibiotic') return '<span class="badge badge-abx">Abx</span>';
+            return `<span class="badge badge-vaso">${name.slice(0,5).toUpperCase()}</span>`;
+          }).join('');
+          vitalCells += `<td>${badges || '—'}</td>`;
+        }
+
+        const riskCells = RISK_COLS.map(c => {
+          const v = p[c.key];
+          return `<td class="risk-cell ${riskClass(v)}">${fmt(v)}</td>`;
+        }).join('');
+
+        return `<tr><th scope="row"><a class="patient-link" href="#" data-id="${p.id}">${p.id}</a></th>${infoCells}${vitalCells}${riskCells}</tr>`;
+      }).join('');
+
+      document.getElementById('table-wrap').innerHTML = `
+        <table>
+          <thead>${groupHeaders}<tr><th>ID</th>${infoHeaders}${vitalHeaders}${riskHeaders}</tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+
+      // Pagination
+      const pagEl = document.getElementById('pagination');
+      if (totalPages <= 1) { pagEl.innerHTML = ''; }
+      else {
+        let pageNumsHtml = '';
+        const maxVisible = 5;
+        let lo = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+        let hi = Math.min(totalPages, lo + maxVisible - 1);
+        if (hi - lo < maxVisible - 1) lo = Math.max(1, hi - maxVisible + 1);
+        for (let i = lo; i <= hi; i++) {
+          pageNumsHtml += `<button class="page-num ${i === currentPage ? 'active' : ''}" data-page="${i}">${i}</button>`;
+        }
+        pagEl.innerHTML = `
+          <button id="btn-prev" ${currentPage <= 1 ? 'disabled' : ''}>← Prev</button>
+          <div class="page-nums">${pageNumsHtml}</div>
+          <button id="btn-next" ${currentPage >= totalPages ? 'disabled' : ''}>Next →</button>
+          <span class="page-info">${start + 1}–${Math.min(start + PAGE_SIZE, total)} of ${total}</span>
+        `;
+        document.getElementById('btn-prev').addEventListener('click', () => { currentPage--; render(patientsData); });
+        document.getElementById('btn-next').addEventListener('click', () => { currentPage++; render(patientsData); });
+        pagEl.querySelectorAll('.page-num').forEach(btn => {
+          btn.addEventListener('click', () => { currentPage = +btn.dataset.page; render(patientsData); });
+        });
+      }
+
+      // Sort handlers
+      document.querySelectorAll('th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+          const key = th.dataset.sort;
+          if (sortKey === key) sortDir *= -1; else { sortKey = key; sortDir = 1; }
+          currentPage = 1;
+          render(patientsData);
+        });
+      });
+
+      // Time stats
+      if (hasEvents) {
+        document.getElementById('timeStats').textContent =
+          `${activeCount} active · ${dischargedCount} discharged of ${totalAll}`;
+      }
+
+      // Meta
+      const thHigh = settings.threshold_high;
+      const thElev = settings.threshold_elevated;
+      document.getElementById('meta').textContent =
+        `${activeCount} active patients · Model: ${data.model} · Green <${(thElev*100).toFixed(0)}% · Yellow ${(thElev*100).toFixed(0)}–${(thHigh*100).toFixed(0)}% · Red ≥${(thHigh*100).toFixed(0)}%`;
+
+      // Patient link handlers
+      document.querySelectorAll('.patient-link').forEach(a => {
+        a.addEventListener('click', (e) => { e.preventDefault(); showDetail(a.dataset.id); });
+      });
+
+      const hashId = (location.hash || '').replace(/^#/, '');
+      if (hashId) showDetail(hashId);
+    }
+
+    // ── Time slider ─────────────────────────────────────────────────
+    const timeSlider = document.getElementById('timeSlider');
+    const timeDisplay = document.getElementById('timeDisplay');
+
+    function updateTimeSlider() {
+      currentMinutes = parseInt(timeSlider.value);
+      timeDisplay.textContent = '(' + fmtTime(currentMinutes) + ')';
+      document.getElementById('demoClock').textContent = fmtClock(currentMinutes);
+      if (patientsData) render(patientsData);
+    }
+    timeSlider.addEventListener('input', updateTimeSlider);
+
+    function setSliderMax() {
+      if (!eventsData) return;
+      let maxMin = 0;
+      for (const pid of Object.keys(eventsData)) {
+        maxMin = Math.max(maxMin, eventsData[pid].max_minutes || 0);
+      }
+      if (maxMin > 0) {
+        timeSlider.max = maxMin;
+        timeSlider.value = 0;
+        currentMinutes = 0;
+        timeDisplay.textContent = fmtTime(0);
+      }
+    }
+
+    // ── Demo playback ───────────────────────────────────────────────
+    const playBtn = document.getElementById('playBtn');
+    const speedSlider = document.getElementById('speedSlider');
+    const speedValue = document.getElementById('speedValue');
+    const resetBtn = document.getElementById('resetBtn');
+
+    const SPEED_MAP = { 1: 1, 2: 5, 3: 15, 4: 60, 5: 180 };
+    const SPEED_LABELS = { 1: '1x', 2: '5x', 3: '15x', 4: '60x', 5: '180x' };
+    let playing = false;
+    let playInterval = null;
+    const TICK_MS = 50;
+
+    function getStepPerTick() {
+      return SPEED_MAP[parseInt(speedSlider.value)] || 5;
+    }
+
+    speedSlider.addEventListener('input', () => {
+      speedValue.textContent = SPEED_LABELS[parseInt(speedSlider.value)] || speedSlider.value + 'x';
+    });
+
+    function startPlayback() {
+      if (playing) return;
+      playing = true;
+      playBtn.textContent = '⏸';
+      playBtn.classList.add('playing');
+      playInterval = setInterval(() => {
+        const step = getStepPerTick();
+        let next = currentMinutes + step;
+        const max = parseInt(timeSlider.max);
+        if (next >= max) {
+          next = max;
+          stopPlayback();
+        }
+        timeSlider.value = next;
+        updateTimeSlider();
+      }, TICK_MS);
+    }
+
+    function stopPlayback() {
+      playing = false;
+      playBtn.textContent = '▶';
+      playBtn.classList.remove('playing');
+      if (playInterval) { clearInterval(playInterval); playInterval = null; }
+    }
+
+    playBtn.addEventListener('click', () => {
+      if (playing) stopPlayback(); else startPlayback();
+    });
+
+    resetBtn.addEventListener('click', () => {
+      stopPlayback();
+      timeSlider.value = 0;
+      updateTimeSlider();
+    });
+
+    // ── Detail panel ────────────────────────────────────────────────
+    const VITAL_LABELS = { heart_rate: 'Heart rate', sbp: 'SBP', dbp: 'DBP', mbp: 'MBP', resp_rate: 'Resp rate', temperature: 'Temp', glucose: 'Glucose', spo2: 'SpO2' };
+    let detailCharts = [];
+
+    async function showDetail(pid) {
+      const panel = document.getElementById('detail-panel');
+      panel.innerHTML = '<p>Loading...</p>';
+      panel.classList.add('visible');
+      location.hash = pid;
+      detailCharts.forEach(c => c.destroy());
+      detailCharts = [];
+
+      const patientEvents = eventsData && eventsData[pid];
+      if (patientEvents && patientEvents.events.length > 0) {
+        renderEventDetail(panel, patientEvents, pid);
+        return;
+      }
+
+      let data = null;
+      try { const r = await fetch('patient_detail.json'); if (r.ok) data = await r.json(); } catch (_) {}
+      const detail = data && data[pid];
+      if (!detail) {
+        panel.innerHTML = '<p class="error">No detail data for ' + pid + '.</p>';
+        return;
+      }
+      renderLegacyDetail(panel, detail, pid);
+    }
+
+    function renderEventDetail(panel, patientData, pid) {
+      const events = patientData.events.filter(e => e.t <= currentMinutes);
+      const vitalSeries = {};
+      events.forEach(e => {
+        if (e.type !== 'vital') return;
+        if (!vitalSeries[e.name]) vitalSeries[e.name] = [];
+        vitalSeries[e.name].push({ x: e.t / 60, y: e.value });
+      });
+
+      const labSeries = {};
+      events.forEach(e => {
+        if (e.type !== 'lab') return;
+        if (!labSeries[e.name]) labSeries[e.name] = [];
+        labSeries[e.name].push({ x: e.t / 60, y: e.value });
+      });
+
+      const preds = patientData.predictions || {};
+      let predsHtml = '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">';
+      RISK_COLS.forEach(c => {
+        const v = preds[c.key];
+        predsHtml += `<div class="risk-cell ${riskClass(v)}" style="padding:6px 12px;border-radius:6px;font-size:0.85rem;">${c.label}: ${fmt(v)}</div>`;
+      });
+      predsHtml += '</div>';
+
+      const vitalKeys = Object.keys(vitalSeries);
+      const labKeys = Object.keys(labSeries);
+
+      let html = `<button class="close-btn" aria-label="Close">×</button><h2>Patient ${pid}</h2>${predsHtml}`;
+
+      if (vitalKeys.length) {
+        html += '<div class="detail-section"><h3>Vitals over time</h3><div class="chart-row">';
+        vitalKeys.forEach(key => {
+          html += `<div class="chart-box"><h4>${VITAL_LABELS[key] || key}</h4><div class="chart-container"><canvas id="dc_${key}"></canvas></div></div>`;
+        });
+        html += '</div></div>';
+      }
+
+      if (labKeys.length) {
+        html += '<div class="detail-section"><h3>Labs</h3><div class="chart-row">';
+        labKeys.forEach(key => {
+          html += `<div class="chart-box"><h4>${key}</h4><div class="chart-container"><canvas id="dc_lab_${key}"></canvas></div></div>`;
+        });
+        html += '</div></div>';
+      }
+
+      panel.innerHTML = html;
+      panel.querySelector('.close-btn').addEventListener('click', () => { panel.classList.remove('visible'); location.hash = ''; });
+
+      const nowHour = currentMinutes / 60;
+      const annotationPlugin = { id: 'nowLine', afterDraw(chart) {
+        const xScale = chart.scales.x;
+        if (!xScale) return;
+        const px = xScale.getPixelForValue(nowHour);
+        if (px < xScale.left || px > xScale.right) return;
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(244,67,54,0.5)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath(); ctx.moveTo(px, chart.scales.y.top); ctx.lineTo(px, chart.scales.y.bottom); ctx.stroke();
+        ctx.restore();
+      }};
+
+      vitalKeys.forEach(key => {
+        const ctx = document.getElementById('dc_' + key);
+        if (!ctx) return;
+        const chart = new Chart(ctx.getContext('2d'), {
+          type: 'line',
+          data: { datasets: [{ data: vitalSeries[key], borderColor: '#1976d2', backgroundColor: 'rgba(25,118,210,0.1)', fill: true, pointRadius: 2 }] },
+          options: { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'linear', title: { display: true, text: 'Hours' } }, y: { beginAtZero: false } }, plugins: { legend: { display: false } } },
+          plugins: [annotationPlugin]
+        });
+        detailCharts.push(chart);
+      });
+
+      labKeys.forEach(key => {
+        const ctx = document.getElementById('dc_lab_' + key);
+        if (!ctx) return;
+        const chart = new Chart(ctx.getContext('2d'), {
+          type: 'line',
+          data: { datasets: [{ data: labSeries[key], borderColor: '#ff9800', backgroundColor: 'rgba(255,152,0,0.1)', fill: true, pointRadius: 3 }] },
+          options: { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'linear', title: { display: true, text: 'Hours' } }, y: { beginAtZero: false } }, plugins: { legend: { display: false } } },
+          plugins: [annotationPlugin]
+        });
+        detailCharts.push(chart);
+      });
+    }
+
+    function renderLegacyDetail(panel, detail, pid) {
+      const v = detail.vitals || [];
+      const inv = detail.interventions || [];
+      const vitalKeys = v.length ? Object.keys(VITAL_LABELS).filter(k => v.some(r => r[k] != null)) : [];
+      const INV_LABELS = { vent: 'Vent', antibiotic: 'Abx', dopamine: 'Dopamine', epinephrine: 'Epi', norepinephrine: 'NE', phenylephrine: 'Phenylephrine', vasopressin: 'Vasopressin', dobutamine: 'Dobutamine', heparin: 'Heparin', crrt: 'CRRT', rbc_trans: 'RBC', platelets_trans: 'Plt', ffp_trans: 'FFP', colloid_bolus: 'Colloid', crystalloid_bolus: 'Crystalloid' };
+      const invKeys = inv.length ? Object.keys(INV_LABELS).filter(k => inv.some(r => r[k] === 1)) : [];
+
+      let html = `<button class="close-btn" aria-label="Close">×</button><h2>Patient ${pid} — Vitals & Interventions</h2>`;
+      if (vitalKeys.length) {
+        html += '<div class="detail-section"><h3>Vitals over time</h3><div class="chart-row">';
+        vitalKeys.forEach(key => { html += `<div class="chart-box"><h4>${VITAL_LABELS[key]}</h4><div class="chart-container"><canvas id="dc_${key}"></canvas></div></div>`; });
+        html += '</div></div>';
+      }
+      if (invKeys.length) {
+        html += '<div class="detail-section"><h3>Interventions</h3><table><thead><tr><th>Hour</th>' + invKeys.map(k => `<th>${INV_LABELS[k]}</th>`).join('') + '</tr></thead><tbody>';
+        inv.forEach(row => { html += '<tr><td>' + row.hour + '</td>' + invKeys.map(k => `<td>${row[k] === 1 ? 'Yes' : '—'}</td>`).join('') + '</tr>'; });
+        html += '</tbody></table></div>';
+      }
+      panel.innerHTML = html;
+      panel.querySelector('.close-btn').addEventListener('click', () => { panel.classList.remove('visible'); location.hash = ''; });
+      vitalKeys.forEach(key => {
+        const ctx = document.getElementById('dc_' + key);
+        if (!ctx) return;
+        const data = v.map(r => ({ x: r.hour, y: r[key] })).filter(d => d.y != null);
+        const chart = new Chart(ctx.getContext('2d'), {
+          type: 'line', data: { datasets: [{ data, borderColor: '#1976d2', backgroundColor: 'rgba(25,118,210,0.1)', fill: true }] },
+          options: { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'linear' }, y: { beginAtZero: false } }, plugins: { legend: { display: false } } }
+        });
+        detailCharts.push(chart);
+      });
+    }
+
+    window.addEventListener('hashchange', () => {
+      const id = (location.hash || '').replace(/^#/, '');
+      if (id) showDetail(id);
+    });
+
+    // ── Init ─────────────────────────────────────────────────────────
+    Promise.all([loadPatientList(), loadEvents()])
+      .then(([listData, events]) => {
+        eventsData = events;
+        setSliderMax();
+        render(listData);
+      })
+      .catch(e => {
+        document.getElementById('table-wrap').innerHTML = '<div class="error">' + e.message + '</div>';
+      });
+  </script>
+</body>
+</html>

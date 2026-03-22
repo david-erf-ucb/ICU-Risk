@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ICU Case Study — Patient Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --surface-alt: #243044;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --success: #3fb950;
+      --danger: #f85149;
+      --warning: #d29922;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'IBM Plex Sans', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 2rem;
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    h2 {
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--text);
+      margin: 2rem 0 0.75rem;
+    }
+
+    .subtitle {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+    }
+
+    .table-noisy {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.75rem;
+      background: var(--surface);
+      border: 1px solid var(--surface-alt);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .table-noisy th,
+    .table-noisy td {
+      padding: 0.5rem 0.6rem;
+      text-align: left;
+      border-bottom: 1px solid var(--surface-alt);
+    }
+
+    .table-noisy th {
+      background: var(--surface-alt);
+      color: var(--text-muted);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .table-noisy tr:last-child td {
+      border-bottom: none;
+    }
+
+    .table-noisy th,
+    .table-noisy td {
+      border-right: 1px solid var(--surface-alt);
+    }
+
+    .table-noisy th:last-child,
+    .table-noisy td:last-child {
+      border-right: none;
+    }
+
+    .vital-val { color: var(--text); }
+
+    .reveal-section {
+      margin-top: 2.5rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--surface-alt);
+    }
+
+    .reveal-badge {
+      display: inline-block;
+      background: var(--accent);
+      color: var(--bg);
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.75rem;
+    }
+
+    .reveal-note {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+      font-style: italic;
+    }
+
+    .table-reveal {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'IBM Plex Sans', system-ui, sans-serif;
+      font-size: 0.8rem;
+      background: var(--surface);
+      border: 1px solid var(--surface-alt);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .table-reveal th,
+    .table-reveal td {
+      padding: 0.5rem 0.6rem;
+      text-align: left;
+      border-bottom: 1px solid var(--surface-alt);
+    }
+
+    .table-reveal th {
+      background: var(--surface-alt);
+      color: var(--text-muted);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .table-reveal tr:last-child td {
+      border-bottom: none;
+    }
+
+    .table-reveal .col-score {
+      font-family: 'IBM Plex Mono', monospace;
+      font-weight: 600;
+    }
+
+    .table-reveal .col-outcome { font-weight: 600; }
+
+    .outcome-survived { color: var(--success); }
+    .outcome-died { color: var(--danger); }
+
+    .score-low { color: var(--success); }
+    .score-mid { color: var(--warning); }
+    .score-high { color: var(--danger); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>ICU Case Study</h1>
+    <p class="subtitle">Twenty-five patients with normal first 8h vitals (HR 60–100, SBP 90–140, RR 12–22, SpO2 95–100%, Temp 36–37.5°C)</p>
+
+    <h2>At the bedside — what clinicians see</h2>
+    <p class="subtitle">Dense, noisy data. No obvious way to distinguish who will deteriorate.</p>
+
+    <table class="table-noisy">
+      <thead>
+        <tr>
+          <th>Age</th>
+          <th>Gender</th>
+          <th>Admission</th>
+          <th>HR</th>
+          <th>SBP</th>
+          <th>RR</th>
+          <th>SpO2</th>
+          <th>Temp</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>44</td>
+          <td>F</td>
+          <td>EW EMER.</td>
+          <td><span class="vital-val">79.2</span></td>
+          <td><span class="vital-val">115</span></td>
+          <td><span class="vital-val">16.1</span></td>
+          <td><span class="vital-val">97.4%</span></td>
+          <td><span class="vital-val">37.1°C</span></td>
+        </tr>
+        <tr>
+          <td>50</td>
+          <td>F</td>
+          <td>EW EMER.</td>
+          <td><span class="vital-val">77.5</span></td>
+          <td><span class="vital-val">128</span></td>
+          <td><span class="vital-val">14.6</span></td>
+          <td><span class="vital-val">100%</span></td>
+          <td><span class="vital-val">36.7°C</span></td>
+        </tr>
+        <tr>
+          <td>81</td>
+          <td>F</td>
+          <td>EW EMER.</td>
+          <td><span class="vital-val">90.6</span></td>
+          <td><span class="vital-val">91.1</span></td>
+          <td><span class="vital-val">16.3</span></td>
+          <td><span class="vital-val">98.2%</span></td>
+          <td><span class="vital-val">37.4°C</span></td>
+        </tr>
+        <tr>
+          <td>69</td>
+          <td>F</td>
+          <td>EW EMER.</td>
+          <td><span class="vital-val">90.0</span></td>
+          <td><span class="vital-val">116</span></td>
+          <td><span class="vital-val">15.3</span></td>
+          <td><span class="vital-val">99.6%</span></td>
+          <td><span class="vital-val">37.1°C</span></td>
+        </tr>
+        <tr>
+          <td>63</td>
+          <td>M</td>
+          <td>SURGICAL SAME DAY ADMISSION</td>
+          <td><span class="vital-val">76.6</span></td>
+          <td><span class="vital-val">113</span></td>
+          <td><span class="vital-val">15.1</span></td>
+          <td><span class="vital-val">99.0%</span></td>
+          <td><span class="vital-val">36.4°C</span></td>
+        </tr>
+        <tr>
+          <td>86</td>
+          <td>M</td>
+          <td>URGENT</td>
+          <td><span class="vital-val">79.5</span></td>
+          <td><span class="vital-val">110</span></td>
+          <td><span class="vital-val">12.7</span></td>
+          <td><span class="vital-val">99.4%</span></td>
+          <td><span class="vital-val">36.0°C</span></td>
+        </tr>
+        <tr>
+          <td>83</td>
+          <td>M</td>
+          <td>EW EMER.</td>
+          <td><span class="vital-val">68.2</span></td>
+          <td><span class="vital-val">108</span></td>
+          <td><span class="vital-val">12.4</span></td>
+          <td><span class="vital-val">100%</span></td>
+          <td><span class="vital-val">36.1°C</span></td>
+        </tr>
+        <tr>
+          <td>71</td>
+          <td>M</td>
+          <td>URGENT</td>
+          <td><span class="vital-val">91.9</span></td>
+          <td><span class="vital-val">122</span></td>
+          <td><span class="vital-val">18.7</span></td>
+          <td><span class="vital-val">98.4%</span></td>
+          <td><span class="vital-val">36.9°C</span></td>
+        </tr>
+        <tr>
+          <td>86</td>
+          <td>F</td>
+          <td>SURGICAL SAME DAY ADMISSION</td>
+          <td><span class="vital-val">82.9</span></td>
+          <td><span class="vital-val">102</span></td>
+          <td><span class="vital-val">16.0</span></td>
+          <td><span class="vital-val">99.8%</span></td>
+          <td><span class="vital-val">36.6°C</span></td>
+        </tr>
+        <tr>
+          <td>79</td>
+          <td>M</td>
+          <td>SURGICAL SAME DAY ADMISSION</td>
+          <td><span class="vital-val">66.2</span></td>
+          <td><span class="vital-val">133</span></td>
+          <td><span class="vital-val">14.8</span></td>
+          <td><span class="vital-val">96.1%</span></td>
+          <td><span class="vital-val">36.7°C</span></td>
+        </tr>
+        <tr>
+          <td>65</td>
+          <td>M</td>
+          <td>SURGICAL SAME DAY ADMISSION</td>
+          <td><span class="vital-val">71.8</span></td>
+          <td><span class="vital-val">111</span></td>
+          <td><span class="vital-val">14.5</span></td>
+          <td><span class="vital-val">99.5%</span></td>
+          <td><span class="vital-val">36.1°C</span></td>
+        </tr>
+        <tr>
+          <td>91</td>
+          <td>F</td>
+          <td>URGENT</td>
+          <td><span class="vital-val">81.8</span></td>
+          <td><span class="vital-val">106</span></td>
+          <td><span class="vital-val">22.0</span></td>
+          <td><span class="vital-val">96.5%</span></td>
+          <td><span class="vital-val">36.5°C</span></td>
+        </tr>
+        <tr>
+          <td>57</td>
+          <td>M</td>
+          <td>URGENT</td>
+          <td><span class="vital-val">89.2</span></td>
+          <td><span class="vital-val">100</span></td>
+          <td><span class="vital-val">19.7</span></td>
+          <td><span class="vital-val">99.2%</span></td>
+          <td><span class="vital-val">37.2°C</span></td>
+        </tr>
+        <tr>
+          <td>85</td>
+          <td>F</td>
+          <td>OBSERVATION ADMIT</td>
+          <td><span class="vital-val">87.4</span></td>
+          <td><span class="vital-val">102</span></td>
+          <td><span class="vital-val">19.0</span></td>
+          <td><span class="vital-val">98.8%</span></td>
+          <td><span class="vital-val">36.2°C</span></td>
+        </tr>
+        <tr>
+          <td>82</td>
+          <td>M</td>
+          <td>EW EMER.</td>
+          <td><span class="vital-val">62.5</span></td>
+          <td><span class="vital-val">120</span></td>
+          <td><span class="vital-val">20.2</span></td>
+          <td><span class="vital-val">100%</span></td>
+          <td><span class="vital-val">37.1°C</span></td>
+        </tr>
+        <tr>
+          <td>84</td>
+          <td>M</td>
+          <td>EW EMER.</td>
+          <td><span class="vital-val">66.1</span></td>
+          <td><span class="vital-val">103</span></td>
+          <td><span class="vital-val">14.8</span></td>
+          <td><span class="vital-val">99.1%</span></td>
+          <td><span class="vital-val">36.0°C</span></td>
+        </tr>
+        <tr>
+          <td>76</td>
+          <td>M</td>
+          <td>URGENT</td>
+          <td><span class="vital-val">71.0</span></td>
+          <td><span class="vital-val">121</span></td>
+          <td><span class="vital-val">19.4</span></td>
+          <td><span class="vital-val">96.8%</span></td>
+          <td><span class="vital-val">36.7°C</span></td>
+        </tr>
+        <tr>
+          <td>58</td>
+          <td>M</td>
+          <td>EW EMER.</td>
+          <td><span class="vital-val">60.1</span></td>
+          <td><span class="vital-val">114</span></td>
+          <td><span class="vital-val">16.9</span></td>
+          <td><span class="vital-val">98.6%</span></td>
+          <td><span class="vital-val">36.5°C</span></td>
+        </tr>
+        <tr>
+          <td>91</td>
+          <td>F</td>
+          <td>EW EMER.</td>
+          <td><span class="vital-val">68.0</span></td>
+          <td><span class="vital-val">104</span></td>
+          <td><span class="vital-val">15.6</span></td>
+          <td><span class="vital-val">99.9%</span></td>
+          <td><span class="vital-val">36.5°C</span></td>
+        </tr>
+        <tr>
+          <td>59</td>
+          <td>M</td>
+          <td>EW EMER.</td>
+          <td><span class="vital-val">93.6</span></td>
+          <td><span class="vital-val">91.9</span></td>
+          <td><span class="vital-val">15.6</span></td>
+          <td><span class="vital-val">96.3%</span></td>
+          <td><span class="vital-val">36.5°C</span></td>
+        </tr>
+        <tr>
+          <td>73</td>
+          <td>M</td>
+          <td>SURGICAL SAME DAY ADMISSION</td>
+          <td><span class="vital-val">76.8</span></td>
+          <td><span class="vital-val">109</span></td>
+          <td><span class="vital-val">17.8</span></td>
+          <td><span class="vital-val">98.3%</span></td>
+          <td><span class="vital-val">36.8°C</span></td>
+        </tr>
+        <tr>
+          <td>62</td>
+          <td>M</td>
+          <td>EW EMER.</td>
+          <td><span class="vital-val">80.5</span></td>
+          <td><span class="vital-val">138</span></td>
+          <td><span class="vital-val">16.9</span></td>
+          <td><span class="vital-val">100%</span></td>
+          <td><span class="vital-val">36.9°C</span></td>
+        </tr>
+        <tr>
+          <td>64</td>
+          <td>M</td>
+          <td>SURGICAL SAME DAY ADMISSION</td>
+          <td><span class="vital-val">80.8</span></td>
+          <td><span class="vital-val">109</span></td>
+          <td><span class="vital-val">16.4</span></td>
+          <td><span class="vital-val">97.9%</span></td>
+          <td><span class="vital-val">36.3°C</span></td>
+        </tr>
+        <tr>
+          <td>78</td>
+          <td>M</td>
+          <td>EW EMER.</td>
+          <td><span class="vital-val">60.1</span></td>
+          <td><span class="vital-val">95.7</span></td>
+          <td><span class="vital-val">16.0</span></td>
+          <td><span class="vital-val">99.6%</span></td>
+          <td><span class="vital-val">36.2°C</span></td>
+        </tr>
+        <tr>
+          <td>67</td>
+          <td>M</td>
+          <td>OBSERVATION ADMIT</td>
+          <td><span class="vital-val">81.2</span></td>
+          <td><span class="vital-val">109</span></td>
+          <td><span class="vital-val">12.6</span></td>
+          <td><span class="vital-val">99.5%</span></td>
+          <td><span class="vital-val">36.4°C</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="reveal-section">
+      <span class="reveal-badge">The reveal</span>
+      <h2>Model prediction after 24h observation</h2>
+      <p class="reveal-note">Model score = predicted in-hospital mortality (0–1 scale; LR = logistic regression, RF = random forest)</p>
+
+      <table class="table-reveal">
+        <thead>
+          <tr>
+            <th>Age</th>
+            <th>Gender</th>
+            <th>Admission</th>
+            <th>First 8h vitals</th>
+            <th>LR</th>
+            <th>RF</th>
+            <th>Outcome</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>44</td>
+            <td>F</td>
+            <td>EW EMER.</td>
+            <td>HR 79.2, SBP 115, RR 16.1, SpO2 97.4%, Temp 37.1°C</td>
+            <td class="col-score score-mid">0.16</td>
+            <td class="col-score score-low">0.00</td>
+            <td class="col-outcome outcome-survived">Survived</td>
+          </tr>
+          <tr>
+            <td>50</td>
+            <td>F</td>
+            <td>EW EMER.</td>
+            <td>HR 77.5, SBP 128, RR 14.6, SpO2 100%, Temp 36.7°C</td>
+            <td class="col-score score-high">0.74</td>
+            <td class="col-score score-high">0.40</td>
+            <td class="col-outcome outcome-died">Died</td>
+          </tr>
+          <tr>
+            <td>81</td>
+            <td>F</td>
+            <td>EW EMER.</td>
+            <td>HR 90.6, SBP 91.1, RR 16.3, SpO2 98.2%, Temp 37.4°C</td>
+            <td class="col-score score-high">0.97</td>
+            <td class="col-score score-high">0.40</td>
+            <td class="col-outcome outcome-died">Died</td>
+          </tr>
+          <tr>
+            <td>69</td>
+            <td>F</td>
+            <td>EW EMER.</td>
+            <td>HR 90.0, SBP 116, RR 15.3, SpO2 99.6%, Temp 37.1°C</td>
+            <td class="col-score score-high">0.60</td>
+            <td class="col-score score-high">0.50</td>
+            <td class="col-outcome outcome-died">Died</td>
+          </tr>
+          <tr>
+            <td>63</td>
+            <td>M</td>
+            <td>SURGICAL SAME DAY ADMISSION</td>
+            <td>HR 76.6, SBP 113, RR 15.1, SpO2 99.0%, Temp 36.4°C</td>
+            <td class="col-score score-low">0.06</td>
+            <td class="col-score score-low">0.00</td>
+            <td class="col-outcome outcome-survived">Survived</td>
+          </tr>
+          <tr>
+            <td>86</td>
+            <td>M</td>
+            <td>URGENT</td>
+            <td>HR 79.5, SBP 110, RR 12.7, SpO2 99.4%, Temp 36.0°C</td>
+            <td class="col-score score-low">0.02</td>
+            <td class="col-score score-low">0.00</td>
+            <td class="col-outcome outcome-survived">Survived</td>
+          </tr>
+          <tr>
+            <td>83</td>
+            <td>M</td>
+            <td>EW EMER.</td>
+            <td>HR 68.2, SBP 108, RR 12.4, SpO2 100%, Temp 36.1°C</td>
+            <td class="col-score score-high">0.71</td>
+            <td class="col-score score-high">0.42</td>
+            <td class="col-outcome outcome-died">Died</td>
+          </tr>
+          <tr>
+            <td>71</td>
+            <td>M</td>
+            <td>URGENT</td>
+            <td>HR 91.9, SBP 122, RR 18.7, SpO2 98.4%, Temp 36.9°C</td>
+            <td class="col-score score-low">0.02</td>
+            <td class="col-score score-low">0.00</td>
+            <td class="col-outcome outcome-survived">Survived</td>
+          </tr>
+          <tr>
+            <td>86</td>
+            <td>F</td>
+            <td>SURGICAL SAME DAY ADMISSION</td>
+            <td>HR 82.9, SBP 102, RR 16.0, SpO2 99.8%, Temp 36.6°C</td>
+            <td class="col-score score-low">0.11</td>
+            <td class="col-score score-high">0.42</td>
+            <td class="col-outcome outcome-died">Died</td>
+          </tr>
+          <tr>
+            <td>79</td>
+            <td>M</td>
+            <td>SURGICAL SAME DAY ADMISSION</td>
+            <td>HR 66.2, SBP 133, RR 14.8, SpO2 96.1%, Temp 36.7°C</td>
+            <td class="col-score score-low">0.14</td>
+            <td class="col-score score-low">0.00</td>
+            <td class="col-outcome outcome-survived">Survived</td>
+          </tr>
+          <tr>
+            <td>65</td>
+            <td>M</td>
+            <td>SURGICAL SAME DAY ADMISSION</td>
+            <td>HR 71.8, SBP 111, RR 14.5, SpO2 99.5%, Temp 36.1°C</td>
+            <td class="col-score score-low">0.01</td>
+            <td class="col-score score-low">0.00</td>
+            <td class="col-outcome outcome-survived">Survived</td>
+          </tr>
+          <tr>
+            <td>91</td>
+            <td>F</td>
+            <td>URGENT</td>
+            <td>HR 81.8, SBP 106, RR 22.0, SpO2 96.5%, Temp 36.5°C</td>
+            <td class="col-score score-high">0.49</td>
+            <td class="col-score score-high">0.53</td>
+            <td class="col-outcome outcome-died">Died</td>
+          </tr>
+          <tr>
+            <td>57</td>
+            <td>M</td>
+            <td>URGENT</td>
+            <td>HR 89.2, SBP 100, RR 19.7, SpO2 99.2%, Temp 37.2°C</td>
+            <td class="col-score score-low">0.02</td>
+            <td class="col-score score-low">0.00</td>
+            <td class="col-outcome outcome-survived">Survived</td>
+          </tr>
+          <tr>
+            <td>85</td>
+            <td>F</td>
+            <td>OBSERVATION ADMIT</td>
+            <td>HR 87.4, SBP 102, RR 19.0, SpO2 98.8%, Temp 36.2°C</td>
+            <td class="col-score score-high">0.90</td>
+            <td class="col-score score-high">0.61</td>
+            <td class="col-outcome outcome-died">Died</td>
+          </tr>
+          <tr>
+            <td>82</td>
+            <td>M</td>
+            <td>EW EMER.</td>
+            <td>HR 62.5, SBP 120, RR 20.2, SpO2 100%, Temp 37.1°C</td>
+            <td class="col-score score-high">0.97</td>
+            <td class="col-score score-high">0.57</td>
+            <td class="col-outcome outcome-died">Died</td>
+          </tr>
+          <tr>
+            <td>84</td>
+            <td>M</td>
+            <td>EW EMER.</td>
+            <td>HR 66.1, SBP 103, RR 14.8, SpO2 99.1%, Temp 36.0°C</td>
+            <td class="col-score score-high">0.66</td>
+            <td class="col-score score-high">0.41</td>
+            <td class="col-outcome outcome-died">Died</td>
+          </tr>
+          <tr>
+            <td>76</td>
+            <td>M</td>
+            <td>URGENT</td>
+            <td>HR 71.0, SBP 121, RR 19.4, SpO2 96.8%, Temp 36.7°C</td>
+            <td class="col-score score-low">0.04</td>
+            <td class="col-score score-low">0.00</td>
+            <td class="col-outcome outcome-survived">Survived</td>
+          </tr>
+          <tr>
+            <td>58</td>
+            <td>M</td>
+            <td>EW EMER.</td>
+            <td>HR 60.1, SBP 114, RR 16.9, SpO2 98.6%, Temp 36.5°C</td>
+            <td class="col-score score-low">0.13</td>
+            <td class="col-score score-low">0.00</td>
+            <td class="col-outcome outcome-survived">Survived</td>
+          </tr>
+          <tr>
+            <td>91</td>
+            <td>F</td>
+            <td>EW EMER.</td>
+            <td>HR 68.0, SBP 104, RR 15.6, SpO2 99.9%, Temp 36.5°C</td>
+            <td class="col-score score-high">0.73</td>
+            <td class="col-score score-mid">0.39</td>
+            <td class="col-outcome outcome-died">Died</td>
+          </tr>
+          <tr>
+            <td>59</td>
+            <td>M</td>
+            <td>EW EMER.</td>
+            <td>HR 93.6, SBP 91.9, RR 15.6, SpO2 96.3%, Temp 36.5°C</td>
+            <td class="col-score score-high">0.96</td>
+            <td class="col-score score-high">0.46</td>
+            <td class="col-outcome outcome-died">Died</td>
+          </tr>
+          <tr>
+            <td>73</td>
+            <td>M</td>
+            <td>SURGICAL SAME DAY ADMISSION</td>
+            <td>HR 76.8, SBP 109, RR 17.8, SpO2 98.3%, Temp 36.8°C</td>
+            <td class="col-score score-low">0.03</td>
+            <td class="col-score score-low">0.00</td>
+            <td class="col-outcome outcome-survived">Survived</td>
+          </tr>
+          <tr>
+            <td>62</td>
+            <td>M</td>
+            <td>EW EMER.</td>
+            <td>HR 80.5, SBP 138, RR 16.9, SpO2 100%, Temp 36.9°C</td>
+            <td class="col-score score-high">0.70</td>
+            <td class="col-score score-high">0.47</td>
+            <td class="col-outcome outcome-died">Died</td>
+          </tr>
+          <tr>
+            <td>64</td>
+            <td>M</td>
+            <td>SURGICAL SAME DAY ADMISSION</td>
+            <td>HR 80.8, SBP 109, RR 16.4, SpO2 97.9%, Temp 36.3°C</td>
+            <td class="col-score score-low">0.01</td>
+            <td class="col-score score-low">0.00</td>
+            <td class="col-outcome outcome-survived">Survived</td>
+          </tr>
+          <tr>
+            <td>78</td>
+            <td>M</td>
+            <td>EW EMER.</td>
+            <td>HR 60.1, SBP 95.7, RR 16.0, SpO2 99.6%, Temp 36.2°C</td>
+            <td class="col-score score-high">0.74</td>
+            <td class="col-score score-high">0.45</td>
+            <td class="col-outcome outcome-died">Died</td>
+          </tr>
+          <tr>
+            <td>67</td>
+            <td>M</td>
+            <td>OBSERVATION ADMIT</td>
+            <td>HR 81.2, SBP 109, RR 12.6, SpO2 99.5%, Temp 36.4°C</td>
+            <td class="col-score score-low">0.13</td>
+            <td class="col-score score-low">0.00</td>
+            <td class="col-outcome outcome-survived">Survived</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>
