@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vital Connect — Real-Time ICU Risk Stratification</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy:    #003262;
+    --navy-dk: #001f3f;
+    --gold:    #FDB515;
+    --gold-lt: #ffeaa0;
+    --slate:   #475569;
+    --muted:   #94A3B8;
+    --light:   #F1F5F9;
+    --border:  #E2E8F0;
+    --white:   #ffffff;
+    --red:     #e53e3e;
+    --teal:    #0F766E;
+    --green:   #166534;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: #0a0f1e;
+    color: var(--white);
+    overflow-x: hidden;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 48px; height: 64px;
+    background: rgba(0,30,60,0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(253,181,21,0.15);
+  }
+  .nav-logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: 20px; color: var(--white); letter-spacing: -0.3px;
+  }
+  .nav-logo span { color: var(--gold); }
+  .nav-links { display: flex; gap: 32px; }
+  .nav-links a {
+    font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.65);
+    text-decoration: none; letter-spacing: 0.5px;
+    transition: color .2s;
+  }
+  .nav-links a:hover { color: var(--white); }
+  .nav-cta {
+    background: var(--gold); color: var(--navy-dk) !important;
+    padding: 8px 20px; border-radius: 6px;
+    font-weight: 600 !important;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #0a0f1e 0%, #001833 50%, #0a2040 100%);
+    position: relative; overflow: hidden;
+    display: flex; align-items: center;
+    padding: 120px 48px 80px;
+  }
+
+  .hero-grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(253,181,21,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(253,181,21,0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+    mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
+  }
+
+  .hero-content { position: relative; max-width: 680px; }
+
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(253,181,21,0.12); border: 1px solid rgba(253,181,21,0.3);
+    padding: 6px 16px; border-radius: 100px;
+    font-size: 12px; font-weight: 500; color: var(--gold);
+    letter-spacing: 1.5px; text-transform: uppercase;
+    margin-bottom: 28px;
+  }
+  .hero-badge::before {
+    content: ''; width: 6px; height: 6px;
+    background: var(--gold); border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+
+  .hero h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(42px, 6vw, 72px);
+    line-height: 1.08; letter-spacing: -1.5px;
+    margin-bottom: 24px;
+  }
+  .hero h1 em {
+    font-style: italic; color: var(--gold);
+  }
+
+  .hero p {
+    font-size: 18px; line-height: 1.7;
+    color: rgba(255,255,255,0.65); max-width: 520px;
+    margin-bottom: 40px; font-weight: 300;
+  }
+
+  .hero-actions { display: flex; gap: 16px; flex-wrap: wrap; }
+  .btn-primary {
+    background: var(--gold); color: var(--navy-dk);
+    padding: 14px 32px; border-radius: 8px;
+    font-weight: 600; font-size: 15px;
+    text-decoration: none; transition: all .2s;
+    letter-spacing: 0.2px;
+  }
+  .btn-primary:hover { background: #ffcc44; transform: translateY(-1px); }
+  .btn-outline {
+    background: transparent; color: var(--white);
+    padding: 13px 32px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.25);
+    font-weight: 500; font-size: 15px;
+    text-decoration: none; transition: all .2s;
+  }
+  .btn-outline:hover { border-color: rgba(255,255,255,0.6); }
+
+  .hero-stats {
+    position: absolute; right: 48px; top: 50%; transform: translateY(-50%);
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .stat-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px; padding: 20px 24px;
+    min-width: 180px;
+    backdrop-filter: blur(8px);
+  }
+  .stat-card .stat-val {
+    font-family: 'DM Mono', monospace;
+    font-size: 32px; font-weight: 500; color: var(--gold);
+    line-height: 1;
+  }
+  .stat-card .stat-label {
+    font-size: 12px; color: rgba(255,255,255,0.45);
+    margin-top: 4px; letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  /* ── SECTION BASE ── */
+  section { padding: 96px 48px; }
+
+  .section-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; font-weight: 500; letter-spacing: 3px;
+    text-transform: uppercase; color: var(--gold);
+    margin-bottom: 16px;
+  }
+
+  h2.section-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(32px, 4vw, 52px);
+    letter-spacing: -1px; line-height: 1.1;
+    margin-bottom: 16px;
+  }
+  .section-sub {
+    font-size: 17px; line-height: 1.7; font-weight: 300;
+    color: rgba(255,255,255,0.55); max-width: 560px;
+    margin-bottom: 56px;
+  }
+
+  /* ── PROBLEM ── */
+  .problem { background: #0a0f1e; }
+
+  .problem-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 2px;
+    border-radius: 16px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .problem-cell {
+    padding: 36px;
+    background: rgba(255,255,255,0.02);
+  }
+  .problem-cell:hover { background: rgba(255,255,255,0.04); }
+  .problem-cell .icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 16px; font-size: 18px;
+  }
+  .icon-red { background: rgba(229,62,62,0.15); }
+  .icon-amber { background: rgba(253,181,21,0.12); }
+  .icon-teal { background: rgba(15,118,110,0.15); }
+  .icon-blue { background: rgba(24,95,165,0.15); }
+  .problem-cell h3 {
+    font-size: 15px; font-weight: 600; margin-bottom: 8px;
+    color: var(--white);
+  }
+  .problem-cell p {
+    font-size: 14px; line-height: 1.6;
+    color: rgba(255,255,255,0.45); font-weight: 300;
+  }
+
+  /* ── HOW IT WORKS ── */
+  .how { background: #050a14; }
+
+  .steps {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+    background: rgba(255,255,255,0.06); border-radius: 16px; overflow: hidden;
+  }
+  .step {
+    padding: 40px 32px; background: #050a14;
+    position: relative;
+  }
+  .step-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 56px; font-weight: 500; line-height: 1;
+    color: rgba(253,181,21,0.12); margin-bottom: 20px;
+    display: block;
+  }
+  .step h3 { font-size: 17px; font-weight: 600; margin-bottom: 10px; }
+  .step p { font-size: 14px; line-height: 1.65; color: rgba(255,255,255,0.5); font-weight: 300; }
+
+  /* ── MODEL ── */
+  .model { background: #0a0f1e; }
+
+  .model-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+    margin-bottom: 24px;
+  }
+  .model-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px; padding: 32px;
+    position: relative; overflow: hidden;
+  }
+  .model-card::before {
+    content: ''; position: absolute;
+    top: 0; left: 0; right: 0; height: 2px;
+  }
+  .model-card.sepsis::before { background: var(--red); }
+  .model-card.mortality::before { background: var(--gold); }
+
+  .model-card h3 { font-size: 18px; font-weight: 600; margin-bottom: 20px; }
+  .metric-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .metric-row:last-child { border-bottom: none; }
+  .metric-label { font-size: 13px; color: rgba(255,255,255,0.45); }
+  .metric-val {
+    font-family: 'DM Mono', monospace;
+    font-size: 15px; font-weight: 500;
+  }
+  .metric-val.gold { color: var(--gold); }
+  .metric-val.good { color: #4ade80; }
+
+  /* imbalance bars */
+  .imbal-section {
+    margin-top: 20px; padding-top: 20px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+  .imbal-label { font-size: 12px; color: rgba(255,255,255,0.4); margin-bottom: 6px; }
+  .imbal-bar { height: 8px; border-radius: 4px; background: rgba(255,255,255,0.1); overflow: hidden; margin-bottom: 12px; }
+  .imbal-fill-red { height: 100%; border-radius: 4px; background: var(--red); }
+  .imbal-fill-gold { height: 100%; border-radius: 4px; background: var(--gold); }
+
+  /* findings row */
+  .findings {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
+    background: rgba(255,255,255,0.06); border-radius: 12px; overflow: hidden;
+  }
+  .finding {
+    padding: 24px; background: #0a0f1e;
+  }
+  .finding .f-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; color: var(--gold); letter-spacing: 2px;
+    margin-bottom: 10px; display: block;
+  }
+  .finding h4 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .finding p { font-size: 13px; color: rgba(255,255,255,0.45); line-height: 1.55; font-weight: 300; }
+
+  /* ── DATA ── */
+  .data-section { background: #050a14; }
+
+  .data-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
+  }
+  .data-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px; padding: 32px;
+  }
+  .data-card .big-num {
+    font-family: 'DM Serif Display', serif;
+    font-size: 48px; color: var(--gold); line-height: 1;
+    margin-bottom: 4px;
+  }
+  .data-card .big-label {
+    font-size: 12px; color: rgba(255,255,255,0.35);
+    letter-spacing: 1px; text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  .data-card h3 { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+  .data-card p { font-size: 14px; color: rgba(255,255,255,0.45); line-height: 1.6; font-weight: 300; }
+
+  /* ── ROADMAP ── */
+  .roadmap { background: #0a0f1e; }
+  .roadmap-list { display: flex; flex-direction: column; gap: 1px; }
+  .roadmap-item {
+    display: grid; grid-template-columns: 60px 1fr auto;
+    align-items: center; gap: 24px;
+    padding: 24px 32px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 12px; margin-bottom: 4px;
+    transition: background .2s;
+  }
+  .roadmap-item:hover { background: rgba(255,255,255,0.05); }
+  .roadmap-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px; color: var(--gold);
+  }
+  .roadmap-item h3 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  .roadmap-item p { font-size: 13px; color: rgba(255,255,255,0.4); font-weight: 300; }
+  .roadmap-tag {
+    font-size: 11px; font-weight: 500; letter-spacing: 1px;
+    padding: 4px 12px; border-radius: 100px;
+    white-space: nowrap;
+  }
+  .tag-green { background: rgba(22,101,52,0.3); color: #4ade80; border: 1px solid rgba(74,222,128,0.2); }
+  .tag-blue  { background: rgba(24,95,165,0.3); color: #60a5fa; border: 1px solid rgba(96,165,250,0.2); }
+  .tag-gold  { background: rgba(253,181,21,0.15); color: var(--gold); border: 1px solid rgba(253,181,21,0.3); }
+
+  /* ── TEAM ── */
+  .team { background: #050a14; }
+  .team-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .team-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px; padding: 36px;
+  }
+  .team-avatar {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: rgba(253,181,21,0.15); border: 2px solid rgba(253,181,21,0.3);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'DM Mono', monospace; font-size: 16px; font-weight: 500;
+    color: var(--gold); margin-bottom: 20px;
+  }
+  .team-card h3 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+  .team-card .role { font-size: 13px; color: var(--gold); margin-bottom: 12px; }
+  .team-card p { font-size: 14px; color: rgba(255,255,255,0.45); line-height: 1.65; font-weight: 300; }
+
+  /* ── FOOTER ── */
+  footer {
+    background: var(--navy-dk);
+    padding: 48px;
+    border-top: 1px solid rgba(253,181,21,0.1);
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 24px;
+  }
+  .footer-brand {
+    font-family: 'DM Serif Display', serif;
+    font-size: 22px; color: var(--white);
+  }
+  .footer-brand span { color: var(--gold); }
+  .footer-meta { font-size: 13px; color: rgba(255,255,255,0.35); }
+  .footer-links { display: flex; gap: 24px; }
+  .footer-links a { font-size: 13px; color: rgba(255,255,255,0.45); text-decoration: none; }
+  .footer-links a:hover { color: var(--white); }
+
+  /* ── DIVIDER ── */
+  .divider {
+    width: 40px; height: 2px; background: var(--gold);
+    margin-bottom: 32px;
+  }
+
+  /* ── ANIMATE ── */
+  .fade-in { opacity: 0; transform: translateY(20px); transition: opacity .6s ease, transform .6s ease; }
+  .fade-in.visible { opacity: 1; transform: translateY(0); }
+
+  @media (max-width: 900px) {
+    nav { padding: 0 24px; }
+    .nav-links { display: none; }
+    section { padding: 64px 24px; }
+    .hero { padding: 100px 24px 64px; }
+    .hero-stats { display: none; }
+    .problem-grid, .model-grid, .team-grid, .data-grid { grid-template-columns: 1fr; }
+    .steps, .findings { grid-template-columns: 1fr; }
+    footer { padding: 32px 24px; flex-direction: column; align-items: flex-start; }
+    .roadmap-item { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">Vital<span>Connect</span></div>
+  <div class="nav-links">
+    <a href="#problem">Problem</a>
+    <a href="#model">Model</a>
+    <a href="#data">Data</a>
+    <a href="#roadmap">Roadmap</a>
+    <a href="#team">Team</a>
+    <a href="https://colab.research.google.com" class="nav-cta">Live Demo</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-content">
+    <div class="hero-badge">UC Berkeley MIDS Capstone &nbsp;·&nbsp; April 2026</div>
+    <h1>Real-time ICU risk<br>stratification, <em>finally</em><br>done right.</h1>
+    <p>Vital Connect scores every ICU patient simultaneously for sepsis and mortality risk — updating every 5 seconds, no spreadsheet required.</p>
+    <div class="hero-actions">
+      <a href="https://colab.research.google.com" class="btn-primary">View Live Demo</a>
+      <a href="#model" class="btn-outline">Explore the Model</a>
+    </div>
+  </div>
+  <div class="hero-stats">
+    <div class="stat-card">
+      <div class="stat-val">0.89</div>
+      <div class="stat-label">Mortality AUROC</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val">0.55</div>
+      <div class="stat-label">Mortality AUPRC</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val">100K+</div>
+      <div class="stat-label">ICU Stays Trained</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val">~67%</div>
+      <div class="stat-label">Deaths Caught @ 10% FPR</div>
+    </div>
+  </div>
+</section>
+
+<!-- PROBLEM -->
+<section class="problem" id="problem">
+  <div class="section-tag">The Problem</div>
+  <div class="divider"></div>
+  <h2 class="section-title">ICUs are flying blind.</h2>
+  <p class="section-sub">Dr. Robby is making life-or-death calls based on vitals that are already old — filled in manually, by a nurse already running between six beds.</p>
+  <div class="problem-grid fade-in">
+    <div class="problem-cell">
+      <div class="icon icon-red">📋</div>
+      <h3>Manual spreadsheets</h3>
+      <p>By the time a vital sign is typed in, it is already out of date. If the unit is short-staffed, it may not be updated at all.</p>
+    </div>
+    <div class="problem-cell">
+      <div class="icon icon-amber">⏱</div>
+      <h3>No early warning</h3>
+      <p>Existing scoring systems like SOFA and qSOFA look at a single snapshot. They cannot see whether a patient is deteriorating or stabilising.</p>
+    </div>
+    <div class="problem-cell">
+      <div class="icon icon-teal">👥</div>
+      <h3>Too many patients</h3>
+      <p>An attending physician cannot hold the full trajectory of 20 patients in their head at once. Who needs attention next is unclear.</p>
+    </div>
+    <div class="problem-cell">
+      <div class="icon icon-blue">📊</div>
+      <h3>Missed deterioration</h3>
+      <p>Sepsis affects 37% of ICU patients. Mortality affects 15%. Late identification costs lives and drives average costs to over $51,000 per stay.</p>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how" id="how">
+  <div class="section-tag">How It Works</div>
+  <div class="divider"></div>
+  <h2 class="section-title">Every patient. Every risk.<br>No spreadsheet required.</h2>
+  <p class="section-sub">Vital Connect reads live ICU data and produces a ranked, colour-coded risk dashboard that updates automatically.</p>
+  <div class="steps fade-in">
+    <div class="step">
+      <span class="step-num">01</span>
+      <h3>Ingest live data</h3>
+      <p>Vitals, labs, and interventions stream in hourly. Frequency of measurement and missingness are encoded as features — signals most systems ignore.</p>
+    </div>
+    <div class="step">
+      <span class="step-num">02</span>
+      <h3>Score with LSTM</h3>
+      <p>A two-layer LSTM with temporal attention reads 24 hours of patient history. It learns which hours matter most — not just what the values were.</p>
+    </div>
+    <div class="step">
+      <span class="step-num">03</span>
+      <h3>Surface the risk</h3>
+      <p>Every patient is ranked by combined sepsis and mortality risk. On the floor: scan the table. At the desk: click a patient for their full 24-hour trajectory.</p>
+    </div>
+  </div>
+</section>
+
+<!-- MODEL -->
+<section class="model" id="model">
+  <div class="section-tag">The Model</div>
+  <div class="divider"></div>
+  <h2 class="section-title">Two models. One pipeline.<br>Smaller, stronger.</h2>
+  <p class="section-sub">LSTM with temporal attention for mortality. GRU for sepsis. Both trained on MIMIC-IV and eICU — the gold standard for ICU research.</p>
+
+  <div class="model-grid fade-in">
+    <div class="model-card mortality">
+      <h3>Mortality Model</h3>
+      <div class="metric-row"><span class="metric-label">AUROC</span><span class="metric-val gold">0.89</span></div>
+      <div class="metric-row"><span class="metric-label">AUPRC</span><span class="metric-val gold">0.55</span></div>
+      <div class="metric-row"><span class="metric-label">Deaths caught @ 10% FPR</span><span class="metric-val good">~67%</span></div>
+      <div class="metric-row"><span class="metric-label">Parameters</span><span class="metric-val">~350K</span></div>
+      <div class="metric-row"><span class="metric-label">Baseline parameters</span><span class="metric-val" style="color:rgba(255,255,255,0.35)">5.7M</span></div>
+      <div class="imbal-section">
+        <div class="imbal-label">Class distribution — 15% positive</div>
+        <div class="imbal-bar"><div class="imbal-fill-gold" style="width:15%"></div></div>
+      </div>
+    </div>
+    <div class="model-card sepsis">
+      <h3>Sepsis Model</h3>
+      <div class="metric-row"><span class="metric-label">Architecture</span><span class="metric-val">GRU</span></div>
+      <div class="metric-row"><span class="metric-label">Evaluation</span><span class="metric-val">Temporal split</span></div>
+      <div class="metric-row"><span class="metric-label">Label source</span><span class="metric-val" style="color:rgba(255,255,255,0.55);font-size:12px">Clinical proxies</span></div>
+      <div class="metric-row"><span class="metric-label">Focal loss</span><span class="metric-val good">Enabled</span></div>
+      <div class="metric-row"><span class="metric-label">Oversampling</span><span class="metric-val good">Enabled</span></div>
+      <div class="imbal-section">
+        <div class="imbal-label">Class distribution — 37% positive</div>
+        <div class="imbal-bar"><div class="imbal-fill-red" style="width:37%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="findings fade-in">
+    <div class="finding">
+      <span class="f-num">01 — KEY FINDING</span>
+      <h4>Pipeline over architecture</h4>
+      <p>Z-score normalisation produced the single largest AUPRC jump — bigger than any model change.</p>
+    </div>
+    <div class="finding">
+      <span class="f-num">02 — KEY FINDING</span>
+      <h4>Temporal beats flat</h4>
+      <p>An LSTM with attention learns which hours matter. A flat vector loses that entirely.</p>
+    </div>
+    <div class="finding">
+      <span class="f-num">03 — KEY FINDING</span>
+      <h4>Smaller, stronger</h4>
+      <p>350K parameters outperforms the 5.7M baseline on AUPRC. Scale is not the answer.</p>
+    </div>
+    <div class="finding">
+      <span class="f-num">04 — KEY FINDING</span>
+      <h4>AUROC misleads</h4>
+      <p>A model predicting survival always gets 85% accuracy. AUPRC tells the clinical truth.</p>
+    </div>
+  </div>
+</section>
+
+<!-- DATA -->
+<section class="data-section" id="data">
+  <div class="section-tag">The Data</div>
+  <div class="divider"></div>
+  <h2 class="section-title">Real patients.<br>Real outcomes.</h2>
+  <p class="section-sub">Not synthetic. Not a pilot study. Gold standard ICU datasets used by the world's top researchers.</p>
+  <div class="data-grid fade-in">
+    <div class="data-card">
+      <div class="big-num">~47K</div>
+      <div class="big-label">ICU stays</div>
+      <h3>MIMIC-IV</h3>
+      <p>MIT Lab for Computational Physiology. Single academic centre. Hourly panel data. The benchmark dataset for ICU ML research.</p>
+    </div>
+    <div class="data-card">
+      <div class="big-num">~200K</div>
+      <div class="big-label">ICU stays</div>
+      <h3>eICU Collaborative</h3>
+      <p>Regenstrief Institute / PhysioNet. 200+ hospitals, 350 ICUs. Broad geographic diversity across the United States.</p>
+    </div>
+    <div class="data-card">
+      <div class="big-num">100K+</div>
+      <div class="big-label">combined stays</div>
+      <h3>METRE Pipeline</h3>
+      <p>Nestor et al. Harmonises both datasets, resolves encoding conflicts, and aligns hourly measurements across institutions.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ROADMAP -->
+<section class="roadmap" id="roadmap">
+  <div class="section-tag">Roadmap</div>
+  <div class="divider"></div>
+  <h2 class="section-title">From prototype<br>to clinical tool.</h2>
+  <p class="section-sub">Three steps between where we are and a system a hospital can actually trust.</p>
+  <div class="roadmap-list fade-in">
+    <div class="roadmap-item">
+      <div class="roadmap-num">01</div>
+      <div>
+        <h3>EHR integration via FHIR</h3>
+        <p>Connect to Epic, Cerner, or Meditech via HL7 FHIR R4. Turns the demo into a live clinical product with real patients and real data.</p>
+      </div>
+      <span class="roadmap-tag tag-green">Next step</span>
+    </div>
+    <div class="roadmap-item">
+      <div class="roadmap-num">02</div>
+      <div>
+        <h3>Clinician feedback loop</h3>
+        <p>Every alert override is a training signal. Quarterly retraining on live data closes the gap between MIMIC and the deployed hospital population.</p>
+      </div>
+      <span class="roadmap-tag tag-blue">In design</span>
+    </div>
+    <div class="roadmap-item">
+      <div class="roadmap-num">03</div>
+      <div>
+        <h3>Prospective shadow validation</h3>
+        <p>Run the model live without showing clinicians the output. Measure whether earlier predictions would have changed care decisions.</p>
+      </div>
+      <span class="roadmap-tag tag-gold">Future work</span>
+    </div>
+  </div>
+</section>
+
+<!-- TEAM -->
+<section class="team" id="team">
+  <div class="section-tag">The Team</div>
+  <div class="divider"></div>
+  <h2 class="section-title">Built at the intersection<br>of engineering and care.</h2>
+  <p class="section-sub">UC Berkeley MIDS Capstone 2026. Advised by Daniel Aranki and Fred Nguyen.</p>
+  <div class="team-grid fade-in">
+    <div class="team-card">
+      <div class="team-avatar">DE</div>
+      <h3>David Erf</h3>
+      <div class="role">Engineering Lead</div>
+      <p>Meta engineer with deep expertise in large-scale data modeling and ML infrastructure. Built the end-to-end LSTM pipeline, ablation study, and model evaluation framework.</p>
+    </div>
+    <div class="team-card">
+      <div class="team-avatar">BP</div>
+      <h3>Bilal Paracha</h3>
+      <div class="role">Clinical & Product Lead</div>
+      <p>Healthcare background driving every clinical design decision — from how mortality risk is weighted to how the dashboard surfaces information to a clinician under pressure.</p>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div>
+    <div class="footer-brand">Vital<span>Connect</span></div>
+    <div class="footer-meta" style="margin-top:8px">UC Berkeley MIDS Capstone &nbsp;·&nbsp; April 2026 &nbsp;·&nbsp; MIMIC-IV & eICU</div>
+  </div>
+  <div class="footer-links">
+    <a href="#problem">Problem</a>
+    <a href="#model">Model</a>
+    <a href="#data">Data</a>
+    <a href="#team">Team</a>
+  </div>
+  <div class="footer-meta">This tool supports clinical decision-making and does not replace clinical judgement.</div>
+</footer>
+
+<script>
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); } });
+}, { threshold: 0.12 });
+document.querySelectorAll('.fade-in').forEach(el => obs.observe(el));
+</script>
+</body>
+</html>
